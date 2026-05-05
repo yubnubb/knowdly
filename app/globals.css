@@ -1,0 +1,7 @@
+/* import Tailwind's base styles, components, and utilities */
+@import "tailwindcss";
+
+/* any global custom styles go below */
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+}
