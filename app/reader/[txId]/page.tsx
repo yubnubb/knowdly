@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { importKey, decryptFile } from '../../lib/crypto'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -55,41 +56,67 @@ export default function ReaderPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // ── Fetch Book Data ───────────────────────────────────────────────────────
+
   async function fetchBook() {
     setStatus('loading')
     setError(null)
 
     try {
 
-      // fetch all books and find this one by txId
+      // ── Step 1: Fetch book metadata ──────────────────────────────────────
       const metaRes  = await fetch('/api/books')
       const metaData = await metaRes.json()
-
-      const found = metaData.books?.find(
-        (b: BookMeta) => b.txId === txId
-      )
-
+      const found    = metaData.books?.find((b: BookMeta) => b.txId === txId)
       if (found) setMeta(found)
 
+      // ── Step 2: Fetch encrypted content from ArLocal ─────────────────────
+      console.log('Fetching encrypted content...')
       const contentRes = await fetch(`http://localhost:1984/${txId}/data`)
-      
+      console.log('Fetch complete, status:', contentRes.status)
+
       if (!contentRes.ok) {
         throw new Error('Could not load book content: ' + contentRes.status)
       }
 
-      const contentType = contentRes.headers.get('content-type') || ''
+      // read the body ONCE — a response body can only be read once
+      const encryptedBuffer = await contentRes.arrayBuffer()
+      console.log('Encrypted buffer size:', encryptedBuffer.byteLength)
 
-      if (contentType.includes('application/pdf')) {
-        // PDF — create a blob URL for the iframe
-        const blob = await contentRes.blob()
-        const url  = URL.createObjectURL(blob)
-        setPdfUrl(url)
-      } else {
-        // text or unknown — render as text
-        const text = await contentRes.text()
-        setTextBody(text)
+      // ── Step 3: Get wallet address from Freighter ────────────────────────
+      console.log('Requesting decryption key...')
+      const { requestAccess } = await import('@stellar/freighter-api')
+      const accessResult = await requestAccess()
+
+      if (accessResult.error) {
+        throw new Error('Please connect your Freighter wallet to read this book')
       }
 
+      // ── Step 4: Request decryption key from key server ───────────────────
+      // server verifies on-chain ownership before releasing the key
+      const keyResponse = await fetch(
+        `/api/keys?arweaveTxId=${txId}&wallet=${accessResult.address}`
+      )
+
+      if (!keyResponse.ok) {
+        const keyError = await keyResponse.json()
+        throw new Error(keyError.error || 'Could not retrieve decryption key')
+      }
+
+      const { key: keyHex, iv } = await keyResponse.json()
+      console.log('Key received. Decrypting content...')
+
+      // ── Step 5: Decrypt the content ──────────────────────────────────────
+      const aesKey        = await importKey(keyHex)
+      const decryptedData = await decryptFile(encryptedBuffer, aesKey, iv)
+      console.log('Decrypted size:', decryptedData.byteLength)
+
+      // ── Step 6: Render the content ───────────────────────────────────────
+      // all uploads are encrypted PDFs — render as PDF blob
+      const blob = new Blob([decryptedData], { type: 'application/pdf' })
+      const url  = URL.createObjectURL(blob)
+      console.log('Blob created, size:', blob.size)
+      setPdfUrl(url)
       setStatus('ready')
 
     } catch (err) {

@@ -25,6 +25,17 @@ export async function POST(request: NextRequest) {
     // extract the file
     const file = formData.get('file') as File | null
 
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file provided' },
+        { status: 400 }
+      )
+    }
+
+    console.log('Received file name:', file.name)
+    console.log('Received file size:', file.size)
+    console.log('Received file type:', file.type)
+
     // extract book metadata
     const title       = formData.get('title')       as string || ''
     const author      = formData.get('author')      as string || ''

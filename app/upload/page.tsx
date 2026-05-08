@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import { registerBook } from '../lib/contract'
 import { requestAccess } from '@stellar/freighter-api'
+import { generateKey, exportKey, encryptFile } from '../lib/crypto'
 
 // TypeScript type for our upload status
 type UploadStatus = 'idle' | 'uploading' | 'done' | 'error'
@@ -76,9 +77,30 @@ export default function UploadPage() {
     setProgress(0)
 
     try {
+      // encrypt the file before uploading to Arweave
+      // the plaintext never leaves the browser
+      console.log('Encrypting file...')
+      const aesKey       = await generateKey()
+      const { encryptedData, iv } = await encryptFile(file, aesKey)
+      console.log('Original file size:', file.size)
+      console.log('Encrypted data size:', encryptedData.byteLength)
+      const keyHex       = await exportKey(aesKey)
+
+      // create an encrypted file blob to upload instead of the original
+      const encryptedBlob = new Blob([encryptedData], {
+        type: 'application/octet-stream'
+      })
+      const encryptedFile = new File(
+        [encryptedBlob],
+        file.name + '.enc',
+        { type: 'application/octet-stream' }
+      )
+
+      console.log('File encrypted. Uploading to Arweave...')
+
       // build a FormData object to send the file and metadata
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', encryptedFile)
       formData.append('title', title)
       formData.append('author', author)
       formData.append('isbn', isbn)
@@ -136,6 +158,21 @@ export default function UploadPage() {
           )
           bookIdMap[data.txId] = bookId
           localStorage.setItem('knowdly_book_ids', JSON.stringify(bookIdMap))
+
+          // store the encryption key on the server
+          // key is tied to the Soroban book ID for ownership verification
+          await fetch('/api/keys', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              arweaveTxId: data.txId,
+              bookId,
+              key: keyHex,
+              iv,
+            }),
+          })
+
+          console.log('Encryption key stored securely')
         }
       } catch (contractErr) {
         // don't fail the upload if contract registration fails

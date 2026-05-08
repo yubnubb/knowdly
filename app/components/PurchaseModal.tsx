@@ -236,10 +236,17 @@ export default function PurchaseModal({ book, onClose, onSuccess }: Props) {
       // this records on-chain that the student owns this book
       try {
         console.log('Minting ownership token on Stellar...')
-        await purchaseBook(
-          studentAddress,
-          0, // TODO: use actual Soroban book ID stored alongside Arweave TX ID
+        // get the correct Soroban book ID from localStorage map
+        const bookIdMap = JSON.parse(
+          localStorage.getItem('knowdly_book_ids') || '{}'
         )
+        const sorobanBookId = bookIdMap[book.txId] ?? -1
+
+        if (sorobanBookId !== -1) {
+          await purchaseBook(studentAddress, sorobanBookId)
+        } else {
+          console.log('No Soroban book ID found — skipping on-chain purchase')
+        }
         console.log('Ownership token minted successfully')
       } catch (contractErr) {
         // don't fail the purchase if token minting fails
