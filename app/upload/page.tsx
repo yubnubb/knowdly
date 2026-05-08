@@ -6,6 +6,8 @@
 
 // useState manages all our form fields and upload state
 import { useState } from 'react'
+import { registerBook } from '../lib/contract'
+import { requestAccess } from '@stellar/freighter-api'
 
 // TypeScript type for our upload status
 type UploadStatus = 'idle' | 'uploading' | 'done' | 'error'
@@ -75,13 +77,8 @@ export default function UploadPage() {
 
     try {
       // build a FormData object to send the file and metadata
-      // to our Next.js API route as a multipart form submission
       const formData = new FormData()
-
-      // append the file itself
       formData.append('file', file)
-
-      // append all the book metadata as individual fields
       formData.append('title', title)
       formData.append('author', author)
       formData.append('isbn', isbn)
@@ -91,18 +88,14 @@ export default function UploadPage() {
       formData.append('royalty', royalty)
 
       // simulate progress while waiting for the server
-      // real progress tracking requires streaming which we'll add later
       const progressInterval = setInterval(() => {
         setProgress(prev => {
-          // slowly increment up to 90% while waiting for server response
-          // the final 10% jumps to 100% when the server confirms success
           if (prev >= 90) return prev
           return prev + 5
         })
       }, 500)
 
       // send the file and metadata to our server-side API route
-      // POST /api/upload handles the actual Arweave upload
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
@@ -111,21 +104,47 @@ export default function UploadPage() {
       // stop the fake progress animation
       clearInterval(progressInterval)
 
-      // parse the JSON response from our API route
-      const data = await response.json()
+      // parse the JSON response
+      const data: { txId: string; error?: string } = await response.json()
 
       if (!response.ok) {
-        // server returned an error — show it to the professor
         throw new Error(data.error || 'Upload failed')
       }
 
-      // success — store the Arweave transaction ID
+      // store the Arweave transaction ID
       setTxId(data.txId)
       setProgress(100)
+
+      // register the book on-chain via Soroban smart contract
+      try {
+        console.log('Registering book on Stellar...')
+        const accessResult = await requestAccess()
+        if (!accessResult.error) {
+          const bookId = await registerBook(
+            accessResult.address,
+            parseFloat(price) * 100,
+            parseInt(royalty) * 100,
+            data.txId,
+            title,
+          )
+          console.log('Book registered on Stellar successfully, book ID:', bookId)
+
+          // store the mapping of Arweave TX ID to Soroban book ID
+          // so the library page can check ownership correctly
+          const bookIdMap = JSON.parse(
+            localStorage.getItem('knowdly_book_ids') || '{}'
+          )
+          bookIdMap[data.txId] = bookId
+          localStorage.setItem('knowdly_book_ids', JSON.stringify(bookIdMap))
+        }
+      } catch (contractErr) {
+        // don't fail the upload if contract registration fails
+        console.error('Contract registration failed:', contractErr)
+      }
+
       setStatus('done')
 
     } catch (err) {
-      // something went wrong — show the error message
       const message = err instanceof Error ? err.message : 'Upload failed'
       setError(message)
       setStatus('error')

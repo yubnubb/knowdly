@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Knowdly — All the knowledge. Finally affordable.</title>
+  <meta name="description" content="Knowdly gives students affordable subscription access to academic textbooks, while giving professors full ownership, transparent royalties, and a direct relationship with their readers." />
+  <meta property="og:title" content="Knowdly — All the knowledge. Finally affordable." />
+  <meta property="og:description" content="Blockchain-powered textbook platform built on Stellar and Arweave." />
+  <meta property="og:url" content="https://knowdly.com" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080b12;
+      --surface:   #0f1320;
+      --border:    #1e2435;
+      --indigo:    #6366f1;
+      --indigo-dim:#3b3f8c;
+      --text:      #e8e6f0;
+      --muted:     #8884a8;
+      --hint:      #4a4870;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      border-bottom: 1px solid var(--border);
+      padding: 1.1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      background: rgba(8,11,18,0.92);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+    }
+    .logo { font-size: 1.3rem; font-weight: 700; color: #fff; text-decoration: none; letter-spacing: -0.03em; }
+    .nav-pill {
+      background: var(--indigo-dim);
+      color: #c4c2f8;
+      font-size: 0.75rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 20px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── LAYOUT ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+
+    /* ── HERO ── */
+    .hero {
+      text-align: center;
+      padding: 7rem 2rem 5rem;
+    }
+    .eyebrow {
+      display: inline-block;
+      background: rgba(99,102,241,0.12);
+      border: 1px solid rgba(99,102,241,0.3);
+      color: #a5a3f8;
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 0.4rem 1rem;
+      border-radius: 20px;
+      letter-spacing: 0.05em;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      color: #fff;
+      max-width: 820px;
+      margin: 0 auto 1.5rem;
+    }
+    h1 span { color: var(--indigo); }
+    .hero-sub {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 580px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.75;
+    }
+
+    /* waitlist form */
+    .waitlist {
+      display: flex;
+      gap: 0.6rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 0.8rem;
+    }
+    .waitlist input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.75rem 1.1rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      width: 280px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .waitlist input::placeholder { color: var(--hint); }
+    .waitlist input:focus { border-color: var(--indigo); }
+    .btn-primary {
+      background: var(--indigo);
+      color: #fff;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-primary:hover { background: #4f52d4; }
+    .btn-primary:active { transform: scale(0.98); }
+    .fine-print { color: var(--hint); font-size: 0.78rem; }
+
+    /* ── STATS ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin: 0 auto 6rem;
+      max-width: 860px;
+    }
+    .stat {
+      background: var(--surface);
+      padding: 2rem 1.5rem;
+      text-align: center;
+    }
+    .stat-number { font-size: 2.4rem; font-weight: 800; color: var(--indigo); letter-spacing: -0.03em; margin-bottom: 0.4rem; }
+    .stat-label { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+
+    /* ── SECTION HEADINGS ── */
+    .section-head { text-align: center; margin-bottom: 3.5rem; }
+    .section-head h2 { font-size: clamp(1.8rem, 3vw, 2.4rem); font-weight: 700; color: #fff; letter-spacing: -0.02em; margin-bottom: 0.75rem; }
+    .section-head p { color: var(--muted); max-width: 480px; margin: 0 auto; }
+
+    /* ── TWO-COL ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 6rem; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+    }
+    .card-icon { font-size: 2rem; margin-bottom: 1rem; }
+    .card h3 { font-size: 1.15rem; font-weight: 600; color: #fff; margin-bottom: 1.5rem; }
+    .steps { display: flex; flex-direction: column; gap: 1.2rem; }
+    .step { display: flex; gap: 1rem; align-items: flex-start; }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: rgba(99,102,241,0.15);
+      color: #a5a3f8;
+      font-size: 0.8rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 2px;
+    }
+    .step-title { font-weight: 500; color: #fff; font-size: 0.95rem; margin-bottom: 0.2rem; }
+    .step-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+
+    /* ── TECH STRIP ── */
+    .tech-strip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      margin-bottom: 6rem;
+    }
+    .tech-label { font-size: 0.7rem; font-weight: 600; color: var(--hint); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem; }
+    .tech-items { display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap; }
+    .tech-item { text-align: center; }
+    .tech-name { font-weight: 600; color: #fff; font-size: 0.95rem; margin-bottom: 0.2rem; }
+    .tech-role { font-size: 0.78rem; color: var(--muted); }
+
+    /* ── MISSION ── */
+    .mission {
+      background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(99,102,241,0.02));
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 20px;
+      padding: 4rem 3rem;
+      text-align: center;
+      margin-bottom: 6rem;
+    }
+    .mission h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700; color: #fff; margin-bottom: 1rem; letter-spacing: -0.02em; }
+    .mission p { color: var(--muted); max-width: 600px; margin: 0 auto 2rem; line-height: 1.75; font-size: 1rem; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    footer span { font-size: 0.82rem; color: var(--hint); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      .stats { grid-template-columns: 1fr; }
+      .two-col { grid-template-columns: 1fr; }
+      .tech-items { gap: 2rem; }
+      .mission { padding: 2.5rem 1.5rem; }
+      nav { padding: 1rem; }
+    }
+
+    /* success message */
+    .success-msg {
+      display: none;
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.3);
+      color: #86efac;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="/" class="logo">Knowdly</a>
+    <span class="nav-pill">Coming Soon</span>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <span class="eyebrow">Built on Stellar · Arweave · Soroban</span>
+    <h1>Textbooks should not cost more than <span>your rent</span></h1>
+    <p class="hero-sub">
+      Knowdly gives students affordable subscription access to academic textbooks,
+      while giving professors full ownership, transparent royalties, and a direct
+      relationship with their readers.
+    </p>
+
+    <div class="waitlist">
+      <input type="email" id="email-input" placeholder="your@university.edu" />
+      <button class="btn-primary" onclick="handleWaitlist()">Join the waitlist</button>
+    </div>
+    <div class="success-msg" id="success-msg">
+      ✓ You're on the list — we'll be in touch soon.
+    </div>
+    <p class="fine-print">No spam. No credit card. Unsubscribe any time.</p>
+  </section>
+
+  <div class="container">
+
+    <!-- STATS -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-number">$1,200+</div>
+        <div class="stat-label">Average annual textbook spend per American student</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number">65%</div>
+        <div class="stat-label">Of students skip required textbooks due to cost</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number">1,000%</div>
+        <div class="stat-label">Increase in textbook prices since the 1970s</div>
+      </div>
+    </div>
+
+    <!-- HOW IT WORKS -->
+    <div class="section-head">
+      <h2>How Knowdly works</h2>
+      <p>Different experiences for students and professors — built on the same transparent, permanent infrastructure.</p>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-icon">🎓</div>
+        <h3>For students</h3>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div>
+              <div class="step-title">Subscribe once</div>
+              <div class="step-desc">Pay a low monthly fee and get access to the entire Knowdly library instantly.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div>
+              <div class="step-title">Read anything</div>
+              <div class="step-desc">Browse thousands of textbooks across every subject. Read in your browser — no downloads needed.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div>
+              <div class="step-title">Own what you buy</div>
+              <div class="step-desc">Purchase individual books as tokens and resell them when your course ends — just like a physical book.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">📚</div>
+        <h3>For professors</h3>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div>
+              <div class="step-title">Upload your content</div>
+              <div class="step-desc">Upload your textbook in minutes. Set your price and royalty rate. Keep full ownership of your work.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div>
+              <div class="step-title">Earn on every sale</div>
+              <div class="step-desc">Receive the full purchase price directly. No waiting, no quarterly statements, no surprises.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div>
+              <div class="step-title">Earn on every resale</div>
+              <div class="step-desc">Smart contracts automatically send you a royalty every time a student resells your book. Forever.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TECH STRIP -->
+    <div class="tech-strip">
+      <div class="tech-label">Built on permanent infrastructure</div>
+      <div class="tech-items">
+        <div class="tech-item">
+          <div class="tech-name">Stellar</div>
+          <div class="tech-role">Ownership + payments</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-name">Soroban</div>
+          <div class="tech-role">Smart contract royalties</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-name">Arweave</div>
+          <div class="tech-role">Permanent storage</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-name">AES-256</div>
+          <div class="tech-role">Content encryption</div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-name">USDC</div>
+          <div class="tech-role">Stable payments</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MISSION -->
+    <div class="mission">
+      <h2>All the knowledge. Finally affordable.</h2>
+      <p>
+        Knowdly is building the infrastructure for a fairer academic publishing system —
+        one where students pay less, professors earn more, and no single company
+        controls access to knowledge. Built in the open, owned by its community.
+      </p>
+      <div class="waitlist">
+        <input type="email" id="email-input-2" placeholder="your@university.edu" />
+        <button class="btn-primary" onclick="handleWaitlist2()">Join the waitlist</button>
+      </div>
+      <div class="success-msg" id="success-msg-2" style="margin-top:0.5rem;">
+        ✓ You're on the list — we'll be in touch soon.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <span>© 2026 Knowdly. All rights reserved.</span>
+    <span>All the knowledge. Finally affordable.</span>
+  </footer>
+
+  <script>
+    function handleWaitlist() {
+      const email = document.getElementById('email-input').value
+      if (!email || !email.includes('@')) {
+        document.getElementById('email-input').style.borderColor = '#f87171'
+        return
+      }
+      document.getElementById('email-input').style.borderColor = '#22c55e'
+      const msg = document.getElementById('success-msg')
+      msg.style.display = 'flex'
+    }
+
+    function handleWaitlist2() {
+      const email = document.getElementById('email-input-2').value
+      if (!email || !email.includes('@')) {
+        document.getElementById('email-input-2').style.borderColor = '#f87171'
+        return
+      }
+      document.getElementById('email-input-2').style.borderColor = '#22c55e'
+      const msg = document.getElementById('success-msg-2')
+      msg.style.display = 'flex'
+    }
+  </script>
+
+</body>
+</html>

@@ -15,6 +15,7 @@ import {
   Memo,
   Account,
 } from '@stellar/stellar-sdk'
+import { purchaseBook } from '../lib/contract'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -227,11 +228,25 @@ export default function PurchaseModal({ book, onClose, onSuccess }: Props) {
         )
       }
 
-      // ── Step 6: Payment confirmed ─────────────────────────────────────────
+      // ── Step 6: Payment confirmed ─────────────────────────────────────────────
 
-      // store the transaction hash for the success screen
-      // student can look this up on stellar.expert to verify the payment
       setTxHash(submitData.hash)
+
+      // mint the ownership token on Soroban
+      // this records on-chain that the student owns this book
+      try {
+        console.log('Minting ownership token on Stellar...')
+        await purchaseBook(
+          studentAddress,
+          0, // TODO: use actual Soroban book ID stored alongside Arweave TX ID
+        )
+        console.log('Ownership token minted successfully')
+      } catch (contractErr) {
+        // don't fail the purchase if token minting fails
+        // the USDC payment already went through
+        console.error('Token minting failed:', contractErr)
+      }
+
       setStatus('done')
 
       // tell the library page this book is now owned

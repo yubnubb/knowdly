@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import PurchaseModal from '../components/PurchaseModal'
+import { ownsBook } from '../lib/contract'
 
 
 // TypeScript type matching what our API route returns
@@ -40,6 +41,9 @@ export default function LibraryPage() {
   // null means the modal is closed
   const [purchasingBook, setPurchasingBook] = useState<Book | null>(null)
 
+  // connected wallet address — used for on-chain ownership checks
+  const [walletAddress, setWalletAddress] = useState<string | null>(null)
+
   // load owned books from localStorage on mount so they survive navigation
   const [ownedBooks, setOwnedBooks] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set()
@@ -73,6 +77,13 @@ export default function LibraryPage() {
       // update the books list with what Arweave returned
       setBooks(data.books)
 
+      // load owned books from localStorage as a fast cache
+      const stored = localStorage.getItem('knowdly_owned_books')
+      if (stored) {
+        const localOwned = new Set<string>(JSON.parse(stored))
+        setOwnedBooks(localOwned)
+      }
+
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load books'
       setError(message)
@@ -84,6 +95,29 @@ export default function LibraryPage() {
   // load all books when the page first mounts
   useEffect(() => {
     fetchBooks('')
+  }, [])
+
+  // when wallet address is set and books are loaded check on-chain ownership
+  useEffect(() => {
+    if (walletAddress && books.length > 0) {
+      checkOnChainOwnership(walletAddress, books)
+    }
+  }, [walletAddress, books])
+
+  // check if Freighter wallet is already connected when page loads
+  useEffect(() => {
+    async function checkWallet() {
+      try {
+        const { requestAccess } = await import('@stellar/freighter-api')
+        const result = await requestAccess()
+        if (!result.error && result.address) {
+          setWalletAddress(result.address)
+        }
+      } catch {
+        // wallet not connected — that's fine
+      }
+    }
+    checkWallet()
   }, [])
 
   // handle search input — fetch with new search term
@@ -99,6 +133,47 @@ export default function LibraryPage() {
 
     // clear the previous timer if they keep typing
     return () => clearTimeout(timer)
+  }
+
+  // checkOnChainOwnership verifies book ownership against the Soroban contract
+  // called after wallet connects or page loads with a connected wallet
+  async function checkOnChainOwnership(walletAddress: string, bookList: Book[]) {
+    try {
+      console.log('Checking on-chain ownership for', walletAddress)
+      const owned = new Set<string>()
+
+      // load the Arweave TX ID to Soroban book ID mapping
+      const bookIdMap = JSON.parse(
+        localStorage.getItem('knowdly_book_ids') || '{}'
+      )
+
+      for (const book of bookList) {
+        // use the stored Soroban book ID if available
+        const bookId = bookIdMap[book.txId] ?? -1
+        if (bookId === -1) {
+          console.log('No book ID found for:', book.title)
+          continue
+        }
+        const owns = await ownsBook(walletAddress, bookId)
+        if (owns) {
+          owned.add(book.txId)
+          console.log('Owns book:', book.title)
+        }
+      }
+
+      if (owned.size > 0) {
+        setOwnedBooks(prev => {
+          const updated = new Set([...prev, ...owned])
+          localStorage.setItem(
+            'knowdly_owned_books',
+            JSON.stringify(Array.from(updated))
+          )
+          return updated
+        })
+      }
+    } catch (err) {
+      console.error('On-chain ownership check failed:', err)
+    }
   }
 
   return (

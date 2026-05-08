@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Arweave from 'arweave'
 
+
 // Tell Next.js to use the Node.js runtime
 export const runtime = 'nodejs'
 
