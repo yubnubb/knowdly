@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Knowdly — Demo</title>
+  <meta name="robots" content="noindex,nofollow"/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080810;--surface:#0f0f1c;--sur2:#161628;
+      --border:rgba(255,255,255,0.08);
+      --ac:#8b7bff;--ac2:#f7c26a;
+      --tx:#ffffff;--tx2:#d4d0f0;--tx3:#a09ccc;--tx4:rgba(160,156,204,0.5);
+      --green:#4ade80;
+    }
+    html{scroll-behavior:smooth}
+    body{
+      font-family:'Plus Jakarta Sans',sans-serif;
+      background:var(--bg);color:var(--tx);
+      min-height:100vh;overflow-x:hidden;
+      line-height:1.6;
+    }
+
+    /* ── Background atmosphere ── */
+    .bg-orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0}
+    .bg-orb-1{width:800px;height:800px;top:-300px;left:-250px;
+      background:radial-gradient(circle,rgba(139,123,255,0.1) 0%,transparent 65%)}
+    .bg-orb-2{width:600px;height:600px;bottom:-200px;right:-150px;
+      background:radial-gradient(circle,rgba(247,194,106,0.07) 0%,transparent 65%)}
+    .bg-orb-3{width:400px;height:400px;top:50%;right:5%;transform:translateY(-50%);
+      background:radial-gradient(circle,rgba(139,123,255,0.06) 0%,transparent 65%)}
+
+    /* ── Grid noise texture overlay ── */
+    body::after{
+      content:'';position:fixed;inset:0;
+      background-image:
+        linear-gradient(rgba(139,123,255,0.03) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(139,123,255,0.03) 1px,transparent 1px);
+      background-size:48px 48px;
+      pointer-events:none;z-index:0;
+    }
+
+    *{position:relative;z-index:1}
+
+    /* ── Nav ── */
+    nav{
+      position:sticky;top:0;z-index:100;
+      background:rgba(8,8,16,0.85);backdrop-filter:blur(20px);
+      border-bottom:1px solid var(--border);
+      padding:1rem 2.5rem;
+      display:flex;align-items:center;justify-content:space-between;
+      gap:1rem;
+    }
+    .logo{font-size:1.35rem;font-weight:800;letter-spacing:-.03em;text-decoration:none;color:var(--tx)}
+    .logo span{background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .demo-badge{
+      display:flex;align-items:center;gap:.5rem;
+      background:rgba(139,123,255,0.1);border:1px solid rgba(139,123,255,0.25);
+      color:#c4baff;font-size:.75rem;font-weight:600;
+      padding:.35rem .9rem;border-radius:100px;letter-spacing:.04em;
+    }
+    .demo-badge::before{content:'';width:6px;height:6px;background:var(--ac);border-radius:50%;animation:pulse 2s ease infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+    .nav-right{display:flex;align-items:center;gap:1rem}
+    .nav-link{color:var(--tx3);font-size:.85rem;font-weight:500;text-decoration:none;transition:color .2s}
+    .nav-link:hover{color:var(--tx)}
+
+    /* ── Hero ── */
+    .hero{
+      padding:7rem 2.5rem 5rem;
+      max-width:1100px;margin:0 auto;
+      display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:center;
+    }
+    .hero-label{
+      font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;
+      color:var(--ac);font-weight:600;margin-bottom:1rem;
+      animation:fadeUp .5s ease both;
+    }
+    .hero h1{
+      font-size:clamp(2.4rem,5vw,3.8rem);font-weight:800;
+      letter-spacing:-.04em;line-height:1.05;
+      margin-bottom:1.4rem;
+      animation:fadeUp .5s .08s ease both;
+    }
+    .hero h1 .gr{
+      background:linear-gradient(135deg,var(--ac) 0%,#b8aaff 45%,var(--ac2) 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .hero p{
+      font-size:1rem;color:var(--tx2);line-height:1.75;font-weight:400;
+      margin-bottom:2rem;
+      animation:fadeUp .5s .16s ease both;
+    }
+    .hero-actions{
+      display:flex;gap:.75rem;flex-wrap:wrap;
+      animation:fadeUp .5s .24s ease both;
+    }
+    .btn-primary{
+      background:var(--ac);color:#fff;
+      padding:.8rem 1.8rem;border-radius:100px;
+      font-family:'Plus Jakarta Sans',sans-serif;font-size:.9rem;font-weight:600;
+      border:none;cursor:pointer;text-decoration:none;
+      box-shadow:0 0 24px rgba(139,123,255,0.4);
+      transition:opacity .2s,transform .15s;display:inline-block;
+    }
+    .btn-primary:hover{opacity:.88;transform:translateY(-1px)}
+    .btn-ghost{
+      color:var(--tx3);font-size:.88rem;font-weight:500;
+      text-decoration:none;padding:.8rem 1.4rem;
+      border:1px solid var(--border);border-radius:100px;
+      transition:color .2s,border-color .2s;display:inline-block;
+    }
+    .btn-ghost:hover{color:var(--tx);border-color:rgba(255,255,255,.16)}
+
+    /* ── App mockup (right side) ── */
+    .mockup{
+      animation:fadeUp .5s .3s ease both;
+    }
+    .mockup-window{
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:0 32px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(139,123,255,0.08);
+    }
+    .mockup-bar{
+      background:var(--sur2);
+      border-bottom:1px solid var(--border);
+      padding:.75rem 1rem;
+      display:flex;align-items:center;gap:.6rem;
+    }
+    .dot{width:10px;height:10px;border-radius:50%}
+    .dot-r{background:#ff6b6b;opacity:.7}
+    .dot-y{background:#f7c26a;opacity:.7}
+    .dot-g{background:#4ade80;opacity:.7}
+    .mockup-url{
+      flex:1;background:rgba(255,255,255,.04);
+      border:1px solid var(--border);border-radius:6px;
+      padding:.3rem .8rem;font-size:.72rem;color:var(--tx3);
+      display:flex;align-items:center;gap:.4rem;
+    }
+    .mockup-url svg{flex-shrink:0;opacity:.5}
+    .mockup-body{padding:1.5rem}
+
+    /* Upload zone */
+    .upload-zone{
+      border:1.5px dashed rgba(139,123,255,0.3);
+      border-radius:12px;padding:2rem 1rem;
+      text-align:center;margin-bottom:1.2rem;
+      background:rgba(139,123,255,0.04);
+      transition:border-color .2s;
+    }
+    .upload-zone:hover{border-color:rgba(139,123,255,0.55)}
+    .upload-icon{
+      width:40px;height:40px;border-radius:10px;
+      background:rgba(139,123,255,0.12);
+      display:flex;align-items:center;justify-content:center;
+      margin:0 auto .8rem;
+    }
+    .upload-zone p{font-size:.8rem;color:var(--tx3);line-height:1.5}
+    .upload-zone strong{color:var(--ac);font-weight:600}
+
+    /* Fake book list */
+    .book-list{display:flex;flex-direction:column;gap:.6rem}
+    .book-item{
+      display:flex;align-items:center;gap:.75rem;
+      padding:.65rem .8rem;border-radius:10px;
+      background:rgba(255,255,255,.025);border:1px solid var(--border);
+      transition:background .2s;
+    }
+    .book-item:hover{background:rgba(255,255,255,.04)}
+    .book-cover{
+      width:32px;height:40px;border-radius:4px;flex-shrink:0;
+    }
+    .book-info{flex:1;min-width:0}
+    .book-title{font-size:.8rem;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .book-meta{font-size:.7rem;color:var(--tx3);margin-top:.1rem}
+    .book-price{font-size:.78rem;font-weight:700;color:var(--ac);flex-shrink:0}
+
+    /* ── Feature cards ── */
+    .features{
+      padding:4rem 2.5rem 6rem;
+      max-width:1100px;margin:0 auto;
+    }
+    .features-label{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--ac);font-weight:600;margin-bottom:.8rem;text-align:center}
+    .features h2{font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:800;letter-spacing:-.03em;text-align:center;margin-bottom:3rem}
+    .features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem}
+    .feat-card{
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:16px;padding:1.75rem;
+      transition:border-color .25s,transform .2s;
+      animation:fadeUp .5s ease both;
+    }
+    .feat-card:hover{border-color:rgba(139,123,255,0.28);transform:translateY(-3px)}
+    .feat-icon{
+      width:40px;height:40px;border-radius:10px;
+      background:rgba(139,123,255,0.1);border:1px solid rgba(139,123,255,0.18);
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.1rem;margin-bottom:1.1rem;
+    }
+    .feat-card h3{font-size:1rem;font-weight:700;color:var(--tx);margin-bottom:.5rem;letter-spacing:-.02em}
+    .feat-card p{font-size:.88rem;color:var(--tx2);line-height:1.65;font-weight:400}
+
+    /* ── Coming soon banner ── */
+    .coming-soon{
+      max-width:1100px;margin:0 auto 6rem;padding:0 2.5rem;
+    }
+    .cs-inner{
+      background:linear-gradient(135deg,rgba(139,123,255,0.1),rgba(247,194,106,0.06));
+      border:1px solid rgba(139,123,255,0.2);
+      border-radius:20px;
+      padding:3rem;
+      display:flex;align-items:center;justify-content:space-between;
+      gap:2rem;flex-wrap:wrap;
+      position:relative;overflow:hidden;
+    }
+    .cs-inner::before{
+      content:'';position:absolute;top:0;left:0;right:0;height:1px;
+      background:linear-gradient(90deg,transparent,var(--ac),var(--ac2),transparent);
+    }
+    .cs-text h3{font-size:1.5rem;font-weight:800;letter-spacing:-.03em;margin-bottom:.5rem}
+    .cs-text h3 .gr{background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .cs-text p{font-size:.92rem;color:var(--tx2);line-height:1.65;max-width:440px}
+    .cs-chips{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1.2rem}
+    .cs-chip{
+      background:rgba(139,123,255,0.1);border:1px solid rgba(139,123,255,0.2);
+      color:#c4baff;font-size:.72rem;font-weight:600;
+      padding:.3rem .8rem;border-radius:100px;letter-spacing:.03em;
+    }
+    .cs-cta{display:flex;flex-direction:column;gap:.75rem;align-items:flex-start}
+    .cs-cta a{white-space:nowrap}
+
+    @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+    @media(max-width:860px){
+      .hero{grid-template-columns:1fr;gap:3rem;padding:4rem 1.5rem 3rem}
+      .features-grid{grid-template-columns:1fr}
+      .features{padding:3rem 1.5rem 4rem}
+      .coming-soon{padding:0 1.5rem;margin-bottom:4rem}
+      .cs-inner{padding:2rem}
+      nav{padding:.9rem 1.5rem}
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div class="bg-orb bg-orb-3"></div>
+
+<nav>
+  <a href="/" class="logo">Know<span>dly</span></a>
+  <div class="demo-badge">BETA DEMO</div>
+  <div class="nav-right">
+    <a href="/" class="nav-link">← Back to site</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-label">Early access preview</div>
+    <h1>The platform is<br/><span class="gr">almost ready.</span></h1>
+    <p>You're seeing an early preview of Knowdly — the permanent publishing platform built on Arweave and Stellar. Upload, encrypt, sell, and earn royalties forever. Full access is coming soon.</p>
+    <div class="hero-actions">
+      <a href="/#waitlist" class="btn-primary">Join the waitlist</a>
+      <a href="/#how" class="btn-ghost">How it works →</a>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-window">
+      <div class="mockup-bar">
+        <div class="dot dot-r"></div>
+        <div class="dot dot-y"></div>
+        <div class="dot dot-g"></div>
+        <div class="mockup-url">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          knowdly.com/app
+        </div>
+      </div>
+      <div class="mockup-body">
+
+        <div class="upload-zone">
+          <div class="upload-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b7bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <p><strong>Drop your file to publish</strong><br/>PDF or EPUB · Encrypted in browser · Stored permanently</p>
+        </div>
+
+        <div class="book-list">
+          <div class="book-item">
+            <div class="book-cover" style="background:linear-gradient(135deg,#8b7bff,#5a4fcf)"></div>
+            <div class="book-info">
+              <div class="book-title">Introduction to Machine Learning</div>
+              <div class="book-meta">Dr. A. Chen · 342 pages · 12 owners</div>
+            </div>
+            <div class="book-price">$24.00</div>
+          </div>
+          <div class="book-item">
+            <div class="book-cover" style="background:linear-gradient(135deg,#f7c26a,#e8a83a)"></div>
+            <div class="book-info">
+              <div class="book-title">The Founder's Playbook</div>
+              <div class="book-meta">M. Torres · 198 pages · 8 owners</div>
+            </div>
+            <div class="book-price">$18.00</div>
+          </div>
+          <div class="book-item">
+            <div class="book-cover" style="background:linear-gradient(135deg,#4ade80,#22c55e)"></div>
+            <div class="book-info">
+              <div class="book-title">Constitutional Law: A Primer</div>
+              <div class="book-meta">Prof. L. Osei · 512 pages · 31 owners</div>
+            </div>
+            <div class="book-price">$32.00</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="features-label">What's coming</div>
+  <h2>Everything you need to publish forever</h2>
+  <div class="features-grid">
+    <div class="feat-card" style="animation-delay:.05s">
+      <div class="feat-icon">🔒</div>
+      <h3>Browser-side encryption</h3>
+      <p>Your content is AES-256 encrypted before it ever leaves your device. We never see your plaintext — no one does.</p>
+    </div>
+    <div class="feat-card" style="animation-delay:.1s">
+      <div class="feat-icon">♾️</div>
+      <h3>Permanent Arweave storage</h3>
+      <p>Once uploaded, your work is stored on Arweave forever. No server, no company, no shutdown can remove it.</p>
+    </div>
+    <div class="feat-card" style="animation-delay:.15s">
+      <div class="feat-icon">⚡</div>
+      <h3>Instant USDC payments</h3>
+      <p>97.5% lands in your Stellar wallet the moment a reader purchases. No invoicing, no waiting, no minimums.</p>
+    </div>
+    <div class="feat-card" style="animation-delay:.2s">
+      <div class="feat-icon">🪙</div>
+      <h3>NFT ownership tokens</h3>
+      <p>Every purchase mints a Soroban NFT to the reader's wallet — permanent, verifiable, on-chain proof of ownership.</p>
+    </div>
+    <div class="feat-card" style="animation-delay:.25s">
+      <div class="feat-icon">🔄</div>
+      <h3>Enforced resale royalties</h3>
+      <p>Set your royalty rate once. The smart contract applies it to every future transfer — automatically, forever, with no bypass.</p>
+    </div>
+    <div class="feat-card" style="animation-delay:.3s">
+      <div class="feat-icon">📖</div>
+      <h3>In-browser reader</h3>
+      <p>PDF and EPUB reading right in the browser. Content decrypts locally once ownership is verified on-chain.</p>
+    </div>
+  </div>
+</section>
+
+<section class="coming-soon">
+  <div class="cs-inner">
+    <div class="cs-text">
+      <h3>Full launch <span class="gr">coming soon</span></h3>
+      <p>We're deploying to Arweave and Stellar mainnet, building the resale marketplace, and wiring up the publisher analytics dashboard. You'll be first to know.</p>
+      <div class="cs-chips">
+        <span class="cs-chip">Mainnet deploy</span>
+        <span class="cs-chip">Resale marketplace</span>
+        <span class="cs-chip">Publisher analytics</span>
+        <span class="cs-chip">Mobile reader</span>
+      </div>
+    </div>
+    <div class="cs-cta">
+      <a href="/#waitlist" class="btn-primary">Get early access</a>
+      <a href="/" class="btn-ghost">← Back to site</a>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
