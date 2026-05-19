@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local config for keys
+.keystore.json
+
+# local env vars (can opt-in for committing if needed)
+.env.local
+
+# local IDE/editor config
+node_modules

@@ -4,107 +4,117 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import PurchaseModal from '../components/PurchaseModal'
-import { ownsBook } from '../lib/contract'
+import { getTokensByOwner, getToken, getTotalBooks } from '../lib/contract'
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-// TypeScript type matching what our API route returns
 type Book = {
-  txId:        string
-  title:       string
-  author:      string
-  isbn:        string
-  edition:     string
-  description: string
-  price:       string
-  royalty:     string
-  fileName:    string
-  contentType: string
+  txId:          string
+  title:         string
+  author:        string
+  isbn:          string
+  edition:       string
+  description:   string
+  price:         string
+  royalty:       string
+  fileName:      string
+  contentType:   string
+  contentFormat: string  // PDF | EPUB | TXT
+  contentMime:   string
+  category:      string
+  sorobanBookId: number  // on-chain book ID — passed to purchase modal directly
 }
+
+type SortOption = 'recent' | 'price-low' | 'price-high' | 'title'
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// format badge color
+function formatBadge(fmt: string) {
+  if (fmt === 'EPUB') return 'bg-purple-900 text-purple-300'
+  if (fmt === 'PDF')  return 'bg-indigo-900 text-indigo-300'
+  return 'bg-gray-800 text-gray-400'
+}
+
+// sort books client-side
+function sortBooks(books: Book[], sort: SortOption): Book[] {
+  const copy = [...books]
+  switch (sort) {
+    case 'price-low':  return copy.sort((a,b) => parseFloat(a.price||'0') - parseFloat(b.price||'0'))
+    case 'price-high': return copy.sort((a,b) => parseFloat(b.price||'0') - parseFloat(a.price||'0'))
+    case 'title':      return copy.sort((a,b) => a.title.localeCompare(b.title))
+    default:           return copy // recent = Arweave HEIGHT_DESC order
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LibraryPage() {
 
-  // all books returned from Arweave
-  const [books, setBooks] = useState<Book[]>([])
-
-  // current search term typed by the student
-  const [search, setSearch] = useState('')
-
-  // tracks whether we are loading books from the API
-  const [loading, setLoading] = useState(true)
-
-  // any error message if the query fails
-  const [error, setError] = useState<string | null>(null)
-
-  // the book the student is currently trying to purchase
-  // null means the modal is closed
+  const [books,          setBooks]          = useState<Book[]>([])
+  const [search,         setSearch]         = useState('')
+  const [category,       setCategory]       = useState('')
+  const [format,         setFormat]         = useState('')
+  const [sort,           setSort]           = useState<SortOption>('recent')
+  const [loading,        setLoading]        = useState(true)
+  const [error,          setError]          = useState<string | null>(null)
   const [purchasingBook, setPurchasingBook] = useState<Book | null>(null)
+  const [walletAddress,  setWalletAddress]  = useState<string | null>(null)
+  const [ownedBooks,     setOwnedBooks]     = useState<Set<string>>(new Set())
 
-  // connected wallet address — used for on-chain ownership checks
-  const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  // ── Fetch ───────────────────────────────────────────────────────────────────
 
-  // load owned books from localStorage on mount so they survive navigation
-  const [ownedBooks, setOwnedBooks] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set()
-    try {
-      const stored = localStorage.getItem('knowdly_owned_books')
-      return stored ? new Set(JSON.parse(stored)) : new Set()
-    } catch {
-      return new Set()
-    }
-  })
-  
-  // fetchBooks calls our /api/books route which queries Arweave GraphQL
-  // optionally filtered by a search term
-  async function fetchBooks(searchTerm: string) {
+  const fetchBooks = useCallback(async (
+    searchTerm: string,
+    cat: string,
+    fmt: string,
+  ) => {
     setLoading(true)
     setError(null)
-
     try {
-      // build the URL with optional search param
-      const url = searchTerm.trim() !== ''
-        ? '/api/books?search=' + encodeURIComponent(searchTerm)
-        : '/api/books'
+      const params = new URLSearchParams()
+      if (searchTerm.trim()) params.set('search',   searchTerm.trim())
+      if (cat.trim())         params.set('category', cat.trim())
+      if (fmt.trim())         params.set('format',   fmt.trim())
 
+      const url      = '/api/books' + (params.toString() ? '?' + params.toString() : '')
       const response = await fetch(url)
       const data     = await response.json()
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to load books')
-      }
+      if (!response.ok) throw new Error(data.error || 'Failed to load books')
 
-      // update the books list with what Arweave returned
-      setBooks(data.books)
+      // enrich books with sorobanBookId from localStorage map
+      // works for books uploaded on this device
+      // books uploaded on other devices will have sorobanBookId -1 until
+      // we move the bookId fully on-chain
+      const bookIdMap = JSON.parse(localStorage.getItem('knowdly_book_ids') || '{}')
+      const enriched  = (data.books as Book[]).map(b => ({
+        ...b,
+        sorobanBookId: bookIdMap[b.txId] !== undefined ? Number(bookIdMap[b.txId]) : -1,
+      }))
+      setBooks(enriched)
 
-      // load owned books from localStorage as a fast cache
+      // load localStorage ownership cache
       const stored = localStorage.getItem('knowdly_owned_books')
-      if (stored) {
-        const localOwned = new Set<string>(JSON.parse(stored))
-        setOwnedBooks(localOwned)
-      }
+      if (stored) setOwnedBooks(new Set(JSON.parse(stored)))
 
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load books'
-      setError(message)
+      setError(err instanceof Error ? err.message : 'Failed to load books')
     } finally {
       setLoading(false)
     }
-  }
-
-  // load all books when the page first mounts
-  useEffect(() => {
-    fetchBooks('')
   }, [])
 
-  // when wallet address is set and books are loaded check on-chain ownership
-  useEffect(() => {
-    if (walletAddress && books.length > 0) {
-      checkOnChainOwnership(walletAddress, books)
-    }
-  }, [walletAddress, books])
+  // initial load
+  useEffect(() => { fetchBooks('', '', '') }, [fetchBooks])
 
-  // check if Freighter wallet is already connected when page loads
+  // re-fetch when category or format filter changes
+  useEffect(() => { fetchBooks(search, category, format) }, [category, format])
+
+  // ── Wallet ──────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     async function checkWallet() {
       try {
@@ -112,62 +122,76 @@ export default function LibraryPage() {
         const result = await requestAccess()
         if (!result.error && result.address) {
           setWalletAddress(result.address)
+          const key    = `knowdly_owned_books_${result.address}`
+          const stored = localStorage.getItem(key)
+          setOwnedBooks(stored ? new Set(JSON.parse(stored)) : new Set())
         }
-      } catch {
-        // wallet not connected — that's fine
-      }
+      } catch { /* wallet not connected */ }
     }
     checkWallet()
   }, [])
 
-  // handle search input — fetch with new search term
+  // on-chain ownership check after wallet + books are ready
+  useEffect(() => {
+    if (walletAddress && books.length > 0) checkOnChainOwnership(walletAddress, books)
+  }, [walletAddress, books])
+
+  // ── Search debounce ─────────────────────────────────────────────────────────
+
   function handleSearch(e: React.ChangeEvent<HTMLInputElement>) {
     const term = e.target.value
     setSearch(term)
-
-    // debounce — wait 500ms after the student stops typing
-    // before sending the query to avoid hammering the API
-    const timer = setTimeout(() => {
-      fetchBooks(term)
-    }, 500)
-
-    // clear the previous timer if they keep typing
+    const timer = setTimeout(() => fetchBooks(term, category, format), 500)
     return () => clearTimeout(timer)
   }
 
-  // checkOnChainOwnership verifies book ownership against the Soroban contract
-  // called after wallet connects or page loads with a connected wallet
-  async function checkOnChainOwnership(walletAddress: string, bookList: Book[]) {
-    try {
-      console.log('Checking on-chain ownership for', walletAddress)
-      const owned = new Set<string>()
+  // ── On-chain ownership via NFT tokens ──────────────────────────────────────
+  // Works on any device — no localStorage dependency for ownership discovery
 
-      // load the Arweave TX ID to Soroban book ID mapping
-      const bookIdMap = JSON.parse(
-        localStorage.getItem('knowdly_book_ids') || '{}'
+  async function checkOnChainOwnership(walletAddr: string, bookList: Book[]) {
+    try {
+      console.log('Checking on-chain ownership for', walletAddr)
+
+      // get all token IDs owned by this wallet
+      const tokenIds = await getTokensByOwner(walletAddr)
+      if (tokenIds.length === 0) return
+      console.log('Owned token IDs:', tokenIds)
+
+      // get each token to find its bookId
+      const tokens = await Promise.all(
+        tokenIds.map(id => getToken(walletAddr, id))
       )
 
+      // build bookId → txId map from localStorage + current book list
+      const bookIdMap    = JSON.parse(localStorage.getItem('knowdly_book_ids') || '{}')
+      const bookIdToTxId = new Map<number, string>()
+
+      for (const [txId, bookId] of Object.entries(bookIdMap)) {
+        bookIdToTxId.set(Number(bookId), txId as string)
+      }
       for (const book of bookList) {
-        // use the stored Soroban book ID if available
-        const bookId = bookIdMap[book.txId] ?? -1
-        if (bookId === -1) {
-          console.log('No book ID found for:', book.title)
-          continue
-        }
-        const owns = await ownsBook(walletAddress, bookId)
-        if (owns) {
-          owned.add(book.txId)
-          console.log('Owns book:', book.title)
+        const localBookId = bookIdMap[book.txId]
+        if (localBookId !== undefined) {
+          bookIdToTxId.set(Number(localBookId), book.txId)
         }
       }
 
-      if (owned.size > 0) {
+      // build set of owned txIds from tokens
+      const onChainOwned = new Set<string>()
+      for (const token of tokens) {
+        if (!token) continue
+        const txId = bookIdToTxId.get(token.bookId)
+        if (txId) {
+          onChainOwned.add(txId)
+          console.log('Owns book via token:', token.id, '→ txId:', txId)
+        }
+      }
+
+      if (onChainOwned.size > 0) {
         setOwnedBooks(prev => {
-          const updated = new Set([...prev, ...owned])
-          localStorage.setItem(
-            'knowdly_owned_books',
-            JSON.stringify(Array.from(updated))
-          )
+          const updated = new Set([...prev, ...onChainOwned])
+          const key = `knowdly_owned_books_${walletAddr}`
+          localStorage.setItem(key, JSON.stringify(Array.from(updated)))
           return updated
         })
       }
@@ -176,24 +200,28 @@ export default function LibraryPage() {
     }
   }
 
+  // ── Derived ─────────────────────────────────────────────────────────────────
+
+  const displayBooks = sortBooks(books, sort)
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <div>
 
-      {/* ── PAGE HEADER ───────────────────────────────────────────────────── */}
+      {/* PAGE HEADER */}
       <div className="mb-10">
-        <h1 className="text-3xl font-bold text-white mb-3">
-          Library
-        </h1>
+        <h1 className="text-3xl font-bold text-white mb-3">Library</h1>
         <p className="text-gray-400">
-          Browse and purchase textbooks. Every book is permanently stored
+          Browse and purchase books. Every title is permanently stored
           on Arweave and owned by its author.
         </p>
       </div>
 
-      {/* ── SEARCH AND FILTER BAR ─────────────────────────────────────────── */}
-      <div className="flex gap-4 mb-8 flex-wrap">
+      {/* FILTER BAR */}
+      <div className="flex gap-3 mb-8 flex-wrap">
 
-        {/* search input — triggers live search as student types */}
+        {/* search */}
         <input
           type="text"
           value={search}
@@ -202,28 +230,48 @@ export default function LibraryPage() {
           className="flex-1 min-w-64 bg-gray-900 border border-gray-700 text-white placeholder-gray-500 px-4 py-2.5 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
         />
 
-        {/* subject filter dropdown — filtering logic to add later */}
-        <select className="bg-gray-900 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors">
-          <option value="">All subjects</option>
-          <option value="cs">Computer Science</option>
-          <option value="math">Mathematics</option>
-          <option value="physics">Physics</option>
-          <option value="biology">Biology</option>
-          <option value="chemistry">Chemistry</option>
-          <option value="economics">Economics</option>
-          <option value="philosophy">Philosophy</option>
+        {/* category filter — real Arweave tag values */}
+        <select
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+          className="bg-gray-900 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+        >
+          <option value="">All categories</option>
+          <option value="textbook">Textbook</option>
+          <option value="novel">Novel</option>
+          <option value="research paper">Research Paper</option>
+          <option value="essay collection">Essay Collection</option>
+          <option value="course notes">Course Notes</option>
+          <option value="reference">Reference</option>
+          <option value="other">Other</option>
         </select>
 
-        {/* sort dropdown — sorting logic to add later */}
-        <select className="bg-gray-900 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors">
+        {/* format filter */}
+        <select
+          value={format}
+          onChange={e => setFormat(e.target.value)}
+          className="bg-gray-900 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+        >
+          <option value="">All formats</option>
+          <option value="PDF">PDF</option>
+          <option value="EPUB">EPUB</option>
+          <option value="TXT">TXT</option>
+        </select>
+
+        {/* sort */}
+        <select
+          value={sort}
+          onChange={e => setSort(e.target.value as SortOption)}
+          className="bg-gray-900 border border-gray-700 text-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+        >
           <option value="recent">Most recent</option>
           <option value="price-low">Price: low to high</option>
           <option value="price-high">Price: high to low</option>
-          <option value="title">Title A-Z</option>
+          <option value="title">Title A–Z</option>
         </select>
       </div>
 
-      {/* ── LOADING STATE ─────────────────────────────────────────────────── */}
+      {/* LOADING */}
       {loading && (
         <div className="text-center py-20">
           <div className="text-gray-500 text-sm animate-pulse">
@@ -232,13 +280,13 @@ export default function LibraryPage() {
         </div>
       )}
 
-      {/* ── ERROR STATE ───────────────────────────────────────────────────── */}
+      {/* ERROR */}
       {error && !loading && (
         <div className="bg-red-950 border border-red-800 rounded-xl p-4 mb-6">
           <div className="text-red-400 font-medium mb-1">Failed to load books</div>
           <code className="text-red-300 text-xs">{error}</code>
           <button
-            onClick={() => fetchBooks(search)}
+            onClick={() => fetchBooks(search, category, format)}
             className="ml-4 text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
           >
             Try again
@@ -246,46 +294,59 @@ export default function LibraryPage() {
         </div>
       )}
 
-      {/* ── RESULTS COUNT ─────────────────────────────────────────────────── */}
+      {/* RESULTS COUNT */}
       {!loading && !error && (
         <div className="text-gray-500 text-sm mb-6">
-          {books.length} {books.length === 1 ? 'book' : 'books'} found
-          {search && ' for "' + search + '"'}
+          {displayBooks.length} {displayBooks.length === 1 ? 'book' : 'books'} found
+          {search    && ` for "${search}"`}
+          {category  && ` · ${category}`}
+          {format    && ` · ${format}`}
         </div>
       )}
 
-      {/* ── BOOK GRID ─────────────────────────────────────────────────────── */}
-      {!loading && !error && books.length > 0 && (
+      {/* BOOK GRID */}
+      {!loading && !error && displayBooks.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {books.map((book) => (
+          {displayBooks.map(book => (
             <div
               key={book.txId}
               className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col gap-4 hover:border-gray-700 transition-colors"
             >
-
-              {/* book cover placeholder */}
-              <div className="w-full h-40 bg-gray-800 rounded-xl flex items-center justify-center">
+              {/* cover placeholder */}
+              <div className="w-full h-40 bg-gray-800 rounded-xl flex items-center justify-center relative">
                 <span className="text-5xl">📖</span>
+                {/* format badge */}
+                {book.contentFormat && (
+                  <span className={`absolute top-3 right-3 text-xs font-semibold px-2 py-0.5 rounded ${formatBadge(book.contentFormat)}`}>
+                    {book.contentFormat}
+                  </span>
+                )}
               </div>
 
-              {/* book metadata */}
+              {/* metadata */}
               <div className="flex-1">
                 <h2 className="text-white font-semibold leading-snug mb-1 line-clamp-2">
                   {book.title}
                 </h2>
-                <p className="text-gray-400 text-sm mb-1">
-                  {book.author}
-                </p>
-                <p className="text-gray-600 text-xs mb-3">
-                  {book.edition && book.edition + ' edition · '}
-                  {book.isbn && 'ISBN ' + book.isbn}
-                </p>
+                <p className="text-gray-400 text-sm mb-1">{book.author}</p>
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  {book.category && (
+                    <span className="text-xs text-indigo-400 capitalize bg-indigo-950 px-2 py-0.5 rounded">
+                      {book.category}
+                    </span>
+                  )}
+                  <p className="text-gray-600 text-xs">
+                    {book.edition && book.edition + ' edition'}
+                    {book.edition && book.isbn && ' · '}
+                    {book.isbn && 'ISBN ' + book.isbn}
+                  </p>
+                </div>
                 <p className="text-gray-500 text-sm leading-relaxed line-clamp-3">
                   {book.description}
                 </p>
               </div>
 
-             {/* price and purchase */}
+              {/* price + action */}
               <div className="flex items-center justify-between pt-2 border-t border-gray-800">
                 <div>
                   <div className="text-white font-bold text-lg">
@@ -293,12 +354,11 @@ export default function LibraryPage() {
                   </div>
                   {book.royalty && (
                     <div className="text-gray-600 text-xs">
-                      {book.royalty}% resale royalty to author
+                      {book.royalty}% resale royalty
                     </div>
                   )}
                 </div>
 
-                {/* purchase or read button — never nested */}
                 {ownedBooks.has(book.txId) ? (
                   <a
                     href={'/reader/' + book.txId}
@@ -316,7 +376,7 @@ export default function LibraryPage() {
                 )}
               </div>
 
-              {/* arweave transaction link */}
+              {/* arweave link */}
               <a
                 href={'https://arweave.net/' + book.txId}
                 target="_blank"
@@ -325,52 +385,49 @@ export default function LibraryPage() {
               >
                 ar://{book.txId}
               </a>
-
             </div>
           ))}
         </div>
       )}
 
-      {/* ── EMPTY STATE ───────────────────────────────────────────────────── */}
-      {!loading && !error && books.length === 0 && (
+      {/* EMPTY STATE */}
+      {!loading && !error && displayBooks.length === 0 && (
         <div className="text-center py-20">
           <div className="text-5xl mb-4">📚</div>
           <div className="text-gray-400 text-lg mb-2">
-            {search ? 'No books found for "' + search + '"' : 'No books yet'}
+            {search ? `No books found for "${search}"` : 'No books yet'}
           </div>
           <div className="text-gray-600 text-sm">
-            {search ? 'Try a different search term' : 'Be the first to upload a textbook'}
+            {search ? 'Try a different search term' : 'Be the first to upload a book'}
           </div>
         </div>
       )}
 
-      {/* ── BOTTOM CTA ────────────────────────────────────────────────────── */}
+      {/* BOTTOM CTA */}
       <div className="border border-gray-800 rounded-2xl p-8 text-center mt-8">
-        <h3 className="text-white font-semibold mb-2">
-          Are you a professor?
-        </h3>
+        <h3 className="text-white font-semibold mb-2">Are you a creator?</h3>
         <p className="text-gray-400 text-sm mb-4">
-          Upload your textbook and start earning fair royalties on every sale and resale.
+          Upload your book and start earning fair royalties on every sale and resale.
         </p>
         <a
           href="/upload"
           className="inline-block bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors"
         >
-          Upload your textbook
+          Upload your book
         </a>
       </div>
-      {/* purchase modal — shown when student clicks Purchase */}
+
+      {/* PURCHASE MODAL */}
       <PurchaseModal
         book={purchasingBook}
         onClose={() => setPurchasingBook(null)}
-        onSuccess={(book) => {
+        onSuccess={book => {
           setOwnedBooks(prev => {
             const updated = new Set(prev).add(book.txId)
-            // persist to localStorage so Read button survives navigation
-            localStorage.setItem(
-              'knowdly_owned_books',
-              JSON.stringify(Array.from(updated))
-            )
+            if (walletAddress) {
+              const key = `knowdly_owned_books_${walletAddress}`
+              localStorage.setItem(key, JSON.stringify(Array.from(updated)))
+            }
             return updated
           })
           setTimeout(() => setPurchasingBook(null), 2000)

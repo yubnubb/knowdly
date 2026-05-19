@@ -1,430 +1,402 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Knowdly — All the knowledge. Finally affordable.</title>
-  <meta name="description" content="Knowdly gives students affordable subscription access to academic textbooks, while giving professors full ownership, transparent royalties, and a direct relationship with their readers." />
-  <meta property="og:title" content="Knowdly — All the knowledge. Finally affordable." />
-  <meta property="og:description" content="Blockchain-powered textbook platform built on Stellar and Arweave." />
-  <meta property="og:url" content="https://knowdly.com" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Knowdly — Publish Once. Own Forever.</title>
+  <meta name="description" content="The permanent publishing platform. Sell your writing directly to readers. Earn royalties forever."/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080810;--surface:#0f0f1c;--sur2:#161628;
+      --border:rgba(255,255,255,0.09);
+      --ac:#8b7bff;--ac2:#f7c26a;--glow:rgba(139,123,255,0.3);
+      --tx:#ffffff;--tx2:#d4d0f0;--tx3:#a09ccc;--tx4:rgba(212,208,240,0.6);
+      --green:#4ade80;--red:#ff6b6b;
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--tx);line-height:1.6;overflow-x:hidden}
+    body::before{content:'';position:fixed;width:800px;height:800px;border-radius:50%;background:radial-gradient(circle,rgba(139,123,255,0.1) 0%,transparent 70%);top:-200px;left:-200px;pointer-events:none;z-index:0}
+    body::after{content:'';position:fixed;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(247,194,106,0.06) 0%,transparent 70%);bottom:-100px;right:-100px;pointer-events:none;z-index:0}
+    *{position:relative;z-index:1}
 
-    :root {
-      --bg:        #080b12;
-      --surface:   #0f1320;
-      --border:    #1e2435;
-      --indigo:    #6366f1;
-      --indigo-dim:#3b3f8c;
-      --text:      #e8e6f0;
-      --muted:     #8884a8;
-      --hint:      #4a4870;
-    }
+    /* NAV */
+    nav{position:sticky;top:0;z-index:100;background:rgba(8,8,16,0.88);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:1.1rem 3rem;display:flex;align-items:center;justify-content:space-between}
+    .logo{font-family:'Plus Jakarta Sans',sans-serif;font-size:1.4rem;font-weight:800;color:var(--tx);text-decoration:none;letter-spacing:-.03em}
+    .logo span{background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .nav-links{display:flex;align-items:center;gap:2.5rem;list-style:none}
+    .nav-links a{color:var(--tx3);text-decoration:none;font-size:.88rem;font-weight:500;transition:color .2s}
+    .nav-links a:hover{color:var(--tx)}
+    .nav-cta{background:var(--ac);color:#fff!important;padding:.55rem 1.4rem;border-radius:100px;font-weight:600!important;transition:opacity .2s,transform .15s!important}
+    .nav-cta:hover{opacity:.85;transform:translateY(-1px)}
 
-    html { scroll-behavior: smooth; }
+    /* HERO */
+    .hero{min-height:95vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6rem 2rem 4rem;overflow:hidden}
+    .hero-badge{display:inline-flex;align-items:center;gap:.5rem;background:rgba(139,123,255,0.13);border:1px solid rgba(139,123,255,0.28);color:#c4baff;font-size:.78rem;font-weight:600;padding:.4rem 1rem;border-radius:100px;margin-bottom:2.5rem;letter-spacing:.02em;animation:fadeUp .6s ease both}
+    .hero-badge::before{content:'';width:6px;height:6px;background:var(--ac);border-radius:50%;animation:pulse 2s ease infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
+    h1{font-size:clamp(3.2rem,8vw,7rem);font-weight:800;line-height:.97;letter-spacing:-.04em;margin-bottom:2rem;animation:fadeUp .6s .1s ease both}
+    h1 .gr{background:linear-gradient(135deg,var(--ac) 0%,#b8aaff 40%,var(--ac2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .hero-sub{font-size:1.1rem;color:var(--tx2);max-width:560px;line-height:1.75;font-weight:400;margin-bottom:3rem;animation:fadeUp .6s .2s ease both}
+    .hero-actions{display:flex;gap:1rem;align-items:center;justify-content:center;flex-wrap:wrap;margin-bottom:5rem;animation:fadeUp .6s .3s ease both}
+    .btn-primary{background:var(--ac);color:#fff;padding:.9rem 2.2rem;font-family:'Plus Jakarta Sans',sans-serif;font-size:.95rem;font-weight:600;border:none;border-radius:100px;cursor:pointer;text-decoration:none;display:inline-block;transition:opacity .2s,transform .15s,box-shadow .2s;box-shadow:0 0 30px rgba(139,123,255,0.4)}
+    .btn-primary:hover{opacity:.9;transform:translateY(-2px);box-shadow:0 0 42px rgba(139,123,255,0.6)}
+    .btn-ghost{color:var(--tx3);font-size:.9rem;font-weight:500;text-decoration:none;display:flex;align-items:center;gap:.5rem;transition:color .2s,border-color .2s;padding:.9rem 1.5rem;border:1px solid var(--border);border-radius:100px}
+    .btn-ghost:hover{color:var(--tx);border-color:rgba(255,255,255,.18)}
+    .hero-stats{display:flex;gap:0;align-items:stretch;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.02);backdrop-filter:blur(10px);overflow:hidden;animation:fadeUp .6s .4s ease both}
+    .stat-item{padding:1.4rem 2.2rem;border-right:1px solid var(--border);text-align:center}
+    .stat-item:last-child{border-right:none}
+    .stat-num{font-size:1.9rem;font-weight:800;background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;margin-bottom:.25rem}
+    .stat-label{font-size:.75rem;color:var(--tx3);font-weight:500}
 
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      min-height: 100vh;
-    }
+    /* TICKER */
+    .ticker{border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:.85rem 0;overflow:hidden;background:rgba(139,123,255,0.04)}
+    .ticker-inner{display:flex;gap:3rem;animation:ticker 28s linear infinite;white-space:nowrap}
+    .ticker-item{font-size:.76rem;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);flex-shrink:0;display:flex;align-items:center;gap:.75rem;font-weight:500}
+    .ticker-dot{width:4px;height:4px;background:var(--ac);border-radius:50%;flex-shrink:0}
+    @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
-    /* ── NAV ── */
-    nav {
-      border-bottom: 1px solid var(--border);
-      padding: 1.1rem 2rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      background: rgba(8,11,18,0.92);
-      backdrop-filter: blur(10px);
-      z-index: 100;
-    }
-    .logo { font-size: 1.3rem; font-weight: 700; color: #fff; text-decoration: none; letter-spacing: -0.03em; }
-    .nav-pill {
-      background: var(--indigo-dim);
-      color: #c4c2f8;
-      font-size: 0.75rem;
-      padding: 0.35rem 0.9rem;
-      border-radius: 20px;
-      font-weight: 500;
-      letter-spacing: 0.04em;
-    }
+    /* SECTIONS */
+    .section-label{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--ac);font-weight:600;margin-bottom:.9rem}
+    .section-title{font-size:clamp(1.9rem,4vw,3rem);font-weight:800;letter-spacing:-.03em;line-height:1.08;margin-bottom:3.5rem}
 
-    /* ── LAYOUT ── */
-    .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+    /* WHO */
+    .who{padding:7rem 3rem;max-width:1200px;margin:0 auto}
+    .who-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:20px;overflow:hidden}
+    .who-card{background:var(--surface);padding:2.5rem 2rem;transition:background .3s}
+    .who-card:hover{background:var(--sur2)}
+    .who-icon{width:44px;height:44px;background:rgba(139,123,255,0.13);border:1px solid rgba(139,123,255,0.22);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;margin-bottom:1.5rem}
+    .who-card h3{font-size:1.05rem;font-weight:700;margin-bottom:.65rem;letter-spacing:-.02em;color:var(--tx)}
+    .who-card p{font-size:.95rem;color:var(--tx2);line-height:1.7;font-weight:400}
+    .who-tag{display:inline-block;margin-top:1.2rem;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ac);font-weight:600}
 
-    /* ── HERO ── */
-    .hero {
-      text-align: center;
-      padding: 7rem 2rem 5rem;
-    }
-    .eyebrow {
-      display: inline-block;
-      background: rgba(99,102,241,0.12);
-      border: 1px solid rgba(99,102,241,0.3);
-      color: #a5a3f8;
-      font-size: 0.78rem;
-      font-weight: 500;
-      padding: 0.4rem 1rem;
-      border-radius: 20px;
-      letter-spacing: 0.05em;
-      margin-bottom: 2rem;
-    }
-    h1 {
-      font-size: clamp(2.2rem, 5vw, 3.8rem);
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.03em;
-      color: #fff;
-      max-width: 820px;
-      margin: 0 auto 1.5rem;
-    }
-    h1 span { color: var(--indigo); }
-    .hero-sub {
-      font-size: 1.15rem;
-      color: var(--muted);
-      max-width: 580px;
-      margin: 0 auto 2.5rem;
-      line-height: 1.75;
-    }
+    /* HOW */
+    .how{padding:7rem 3rem;max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:6rem;align-items:start}
+    .how-left{position:sticky;top:6rem}
+    .how-left p{font-size:1rem;color:var(--tx2);line-height:1.75;font-weight:400;margin-top:1.2rem}
+    .steps{display:flex;flex-direction:column;gap:1.5rem}
+    .step-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;transition:border-color .3s,background .3s}
+    .step-card:hover{border-color:rgba(139,123,255,0.35);background:var(--sur2)}
+    .step-head{display:flex;align-items:center;gap:1rem;margin-bottom:.9rem}
+    .step-num-badge{width:32px;height:32px;background:linear-gradient(135deg,var(--ac),#a394ff);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:800;color:#fff;flex-shrink:0}
+    .step-card h3{font-size:1.05rem;font-weight:700;color:var(--tx);letter-spacing:-.02em}
+    .step-card p{font-size:.95rem;color:var(--tx2);line-height:1.75;font-weight:400}
+    .step-tech{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem}
+    .tech-chip{background:rgba(139,123,255,0.11);border:1px solid rgba(139,123,255,0.2);color:#c4baff;font-size:.7rem;font-weight:600;padding:.25rem .7rem;border-radius:100px;letter-spacing:.03em}
 
-    /* waitlist form */
-    .waitlist {
-      display: flex;
-      gap: 0.6rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-bottom: 0.8rem;
-    }
-    .waitlist input {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0.75rem 1.1rem;
-      border-radius: 10px;
-      font-size: 0.95rem;
-      width: 280px;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    .waitlist input::placeholder { color: var(--hint); }
-    .waitlist input:focus { border-color: var(--indigo); }
-    .btn-primary {
-      background: var(--indigo);
-      color: #fff;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 10px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
-    }
-    .btn-primary:hover { background: #4f52d4; }
-    .btn-primary:active { transform: scale(0.98); }
-    .fine-print { color: var(--hint); font-size: 0.78rem; }
+    /* ECONOMICS */
+    .economics{padding:7rem 3rem;background:linear-gradient(180deg,transparent,rgba(139,123,255,0.04),transparent)}
+    .economics-inner{max-width:1200px;margin:0 auto}
+    .economics-header{text-align:center;margin-bottom:4rem}
+    .econ-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}
+    .econ-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2.5rem;transition:border-color .3s,transform .2s;position:relative;overflow:hidden}
+    .econ-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--ac),transparent);opacity:0;transition:opacity .3s}
+    .econ-card:hover{border-color:rgba(139,123,255,0.25);transform:translateY(-4px)}
+    .econ-card:hover::before{opacity:1}
+    .econ-number{font-size:4rem;font-weight:800;background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;margin-bottom:.75rem}
+    .econ-card h3{font-size:1.15rem;font-weight:700;color:var(--tx);margin-bottom:.65rem;letter-spacing:-.02em}
+    .econ-card p{font-size:1rem;color:var(--tx2);line-height:1.7;font-weight:400}
 
-    /* ── STATS ── */
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-      margin: 0 auto 6rem;
-      max-width: 860px;
-    }
-    .stat {
-      background: var(--surface);
-      padding: 2rem 1.5rem;
-      text-align: center;
-    }
-    .stat-number { font-size: 2.4rem; font-weight: 800; color: var(--indigo); letter-spacing: -0.03em; margin-bottom: 0.4rem; }
-    .stat-label { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+    /* COMPARISON */
+    .comparison{padding:7rem 3rem;max-width:1200px;margin:0 auto}
+    .compare-wrap{border:1px solid var(--border);border-radius:20px;overflow:hidden}
+    .compare-table{width:100%;border-collapse:collapse}
+    .compare-table th{font-size:.83rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--tx2);padding:1.2rem 1.5rem;text-align:left;background:var(--surface);border-bottom:1px solid var(--border)}
+    .compare-table th.knowdly-head{color:var(--ac);font-size:1rem;text-transform:none;letter-spacing:0;font-weight:800;background:rgba(139,123,255,0.07)}
+    .compare-table td{padding:1rem 1.5rem;border-bottom:1px solid var(--border);font-size:1rem;color:var(--tx2);font-weight:400}
+    .compare-table tr:last-child td{border-bottom:none}
+    .compare-table td:first-child{color:var(--tx);font-weight:600}
+    .knowdly-col{background:rgba(139,123,255,0.05);color:var(--tx)!important;font-weight:700!important}
+    .check{color:var(--green);font-weight:700}
+    .cross{color:var(--red);font-weight:700}
 
-    /* ── SECTION HEADINGS ── */
-    .section-head { text-align: center; margin-bottom: 3.5rem; }
-    .section-head h2 { font-size: clamp(1.8rem, 3vw, 2.4rem); font-weight: 700; color: #fff; letter-spacing: -0.02em; margin-bottom: 0.75rem; }
-    .section-head p { color: var(--muted); max-width: 480px; margin: 0 auto; }
+    /* USE CASES */
+    .usecases{padding:7rem 3rem;max-width:1200px;margin:0 auto}
+    .usecase-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}
+    .usecase-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;transition:border-color .25s,transform .2s}
+    .usecase-card:hover{border-color:rgba(247,194,106,0.28);transform:translateY(-3px)}
+    .usecase-icon{font-size:1.75rem;margin-bottom:1.2rem;display:block}
+    .usecase-card h3{font-size:1.25rem;font-weight:700;color:var(--tx);margin-bottom:.6rem;letter-spacing:-.02em}
+    .usecase-card p{font-size:1rem;color:var(--tx2);line-height:1.65;font-weight:400}
+    .usecase-examples{margin-top:.9rem;font-size:.72rem;color:rgba(247,194,106,0.65);font-style:italic}
 
-    /* ── TWO-COL ── */
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 6rem; }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem;
-    }
-    .card-icon { font-size: 2rem; margin-bottom: 1rem; }
-    .card h3 { font-size: 1.15rem; font-weight: 600; color: #fff; margin-bottom: 1.5rem; }
-    .steps { display: flex; flex-direction: column; gap: 1.2rem; }
-    .step { display: flex; gap: 1rem; align-items: flex-start; }
-    .step-num {
-      width: 28px; height: 28px; border-radius: 50%;
-      background: rgba(99,102,241,0.15);
-      color: #a5a3f8;
-      font-size: 0.8rem; font-weight: 700;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; margin-top: 2px;
-    }
-    .step-title { font-weight: 500; color: #fff; font-size: 0.95rem; margin-bottom: 0.2rem; }
-    .step-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+    /* TECH STRIP */
+    .tech-strip{padding:4rem 3rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .tech-strip-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:3rem;flex-wrap:wrap}
+    .tech-strip p{font-size:.9rem;color:var(--tx2);max-width:340px;line-height:1.7;font-weight:400}
+    .tech-pills{display:flex;gap:.75rem;flex-wrap:wrap}
+    .tech-pill{background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:.6rem 1.2rem;font-size:.8rem;display:flex;align-items:center;gap:.5rem;transition:border-color .2s}
+    .tech-pill:hover{border-color:rgba(139,123,255,0.35)}
+    .tech-pill strong{color:var(--tx);font-weight:600}
+    .tech-pill span{color:var(--tx3);font-size:.72rem}
 
-    /* ── TECH STRIP ── */
-    .tech-strip {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem;
-      text-align: center;
-      margin-bottom: 6rem;
-    }
-    .tech-label { font-size: 0.7rem; font-weight: 600; color: var(--hint); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem; }
-    .tech-items { display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap; }
-    .tech-item { text-align: center; }
-    .tech-name { font-weight: 600; color: #fff; font-size: 0.95rem; margin-bottom: 0.2rem; }
-    .tech-role { font-size: 0.78rem; color: var(--muted); }
+    /* WAITLIST */
+    .waitlist{padding:9rem 3rem;text-align:center;position:relative;overflow:hidden}
+    .waitlist-glow{position:absolute;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(139,123,255,0.13) 0%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+    .waitlist h2{font-size:clamp(2.4rem,6vw,5rem);font-weight:800;letter-spacing:-.04em;line-height:1;margin-bottom:1.5rem}
+    .waitlist h2 .gr{background:linear-gradient(135deg,var(--ac) 0%,#b8aaff 50%,var(--ac2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .waitlist>p{color:var(--tx2);font-size:1rem;margin-bottom:3rem;font-weight:400}
+    .waitlist-form{display:flex;gap:.75rem;max-width:480px;margin:0 auto 1rem;flex-wrap:wrap;justify-content:center}
+    .waitlist-form input{flex:1;min-width:240px;background:var(--surface);border:1px solid var(--border);color:var(--tx);padding:.9rem 1.5rem;font-family:'Plus Jakarta Sans',sans-serif;font-size:.9rem;border-radius:100px;outline:none;transition:border-color .2s;font-weight:400}
+    .waitlist-form input::placeholder{color:var(--tx3)}
+    .waitlist-form input:focus{border-color:var(--ac)}
+    .waitlist-form button{background:var(--ac);color:#fff;border:none;border-radius:100px;padding:.9rem 1.75rem;font-family:'Plus Jakarta Sans',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;box-shadow:0 0 24px rgba(139,123,255,0.4);transition:opacity .2s,transform .15s;min-width:140px}
+    .waitlist-form button:hover{opacity:.85;transform:translateY(-1px)}
+    .waitlist-form button:disabled{opacity:.6;transform:none;cursor:default}
+    .form-feedback{font-size:.875rem;margin-top:.75rem;min-height:1.4rem;font-weight:500}
+    .feedback-success{color:var(--green)}
+    .feedback-error{color:var(--red)}
+    .feedback-dupe{color:var(--ac2)}
+    .waitlist-fine{color:rgba(255,255,255,.22);font-size:.75rem;margin-top:1rem}
 
-    /* ── MISSION ── */
-    .mission {
-      background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(99,102,241,0.02));
-      border: 1px solid rgba(99,102,241,0.2);
-      border-radius: 20px;
-      padding: 4rem 3rem;
-      text-align: center;
-      margin-bottom: 6rem;
-    }
-    .mission h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700; color: #fff; margin-bottom: 1rem; letter-spacing: -0.02em; }
-    .mission p { color: var(--muted); max-width: 600px; margin: 0 auto 2rem; line-height: 1.75; font-size: 1rem; }
+    /* FOOTER */
+    footer{border-top:1px solid var(--border);padding:2rem 3rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;font-size:.8rem;color:var(--tx3)}
 
-    /* ── FOOTER ── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-    footer span { font-size: 0.82rem; color: var(--hint); }
+    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 
-    /* ── RESPONSIVE ── */
-    @media (max-width: 640px) {
-      .stats { grid-template-columns: 1fr; }
-      .two-col { grid-template-columns: 1fr; }
-      .tech-items { gap: 2rem; }
-      .mission { padding: 2.5rem 1.5rem; }
-      nav { padding: 1rem; }
-    }
-
-    /* success message */
-    .success-msg {
-      display: none;
-      background: rgba(34,197,94,0.1);
-      border: 1px solid rgba(34,197,94,0.3);
-      color: #86efac;
-      padding: 0.6rem 1.2rem;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      margin-top: 0.5rem;
-      justify-content: center;
+    @media(max-width:900px){
+      nav{padding:1rem 1.5rem}
+      .nav-links{display:none}
+      .who-grid{grid-template-columns:1fr 1fr}
+      .how{grid-template-columns:1fr;gap:3rem;padding:4rem 1.5rem}
+      .how-left{position:static}
+      .econ-grid{grid-template-columns:1fr}
+      .usecase-grid{grid-template-columns:1fr}
+      .comparison{padding:4rem 1.5rem;overflow-x:auto}
+      .tech-strip-inner{flex-direction:column}
+      .waitlist{padding:5rem 1.5rem}
+      .hero-stats{flex-wrap:wrap}
+      .stat-item{flex:1;min-width:120px}
+      .who,.usecases,.economics,.comparison{padding:4rem 1.5rem}
     }
   </style>
 </head>
 <body>
 
-  <!-- NAV -->
-  <nav>
-    <a href="/" class="logo">Knowdly</a>
-    <span class="nav-pill">Coming Soon</span>
-  </nav>
+<nav>
+  <a href="/" class="logo">Know<span>dly</span></a>
+  <ul class="nav-links">
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#economics">Economics</a></li>
+    <li><a href="#usecases">Publishers</a></li>
+    <li><a href="#waitlist" class="nav-cta">Join waitlist</a></li>
+  </ul>
+</nav>
 
-  <!-- HERO -->
-  <section class="hero">
-    <span class="eyebrow">Built on Stellar · Arweave · Soroban</span>
-    <h1>Textbooks should not cost more than <span>your rent</span></h1>
-    <p class="hero-sub">
-      Knowdly gives students affordable subscription access to academic textbooks,
-      while giving professors full ownership, transparent royalties, and a direct
-      relationship with their readers.
-    </p>
-
-    <div class="waitlist">
-      <input type="email" id="email-input" placeholder="your@university.edu" />
-      <button class="btn-primary" onclick="handleWaitlist()">Join the waitlist</button>
-    </div>
-    <div class="success-msg" id="success-msg">
-      ✓ You're on the list — we'll be in touch soon.
-    </div>
-    <p class="fine-print">No spam. No credit card. Unsubscribe any time.</p>
-  </section>
-
-  <div class="container">
-
-    <!-- STATS -->
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-number">$1,200+</div>
-        <div class="stat-label">Average annual textbook spend per American student</div>
-      </div>
-      <div class="stat">
-        <div class="stat-number">65%</div>
-        <div class="stat-label">Of students skip required textbooks due to cost</div>
-      </div>
-      <div class="stat">
-        <div class="stat-number">1,000%</div>
-        <div class="stat-label">Increase in textbook prices since the 1970s</div>
-      </div>
-    </div>
-
-    <!-- HOW IT WORKS -->
-    <div class="section-head">
-      <h2>How Knowdly works</h2>
-      <p>Different experiences for students and professors — built on the same transparent, permanent infrastructure.</p>
-    </div>
-
-    <div class="two-col">
-      <div class="card">
-        <div class="card-icon">🎓</div>
-        <h3>For students</h3>
-        <div class="steps">
-          <div class="step">
-            <div class="step-num">1</div>
-            <div>
-              <div class="step-title">Subscribe once</div>
-              <div class="step-desc">Pay a low monthly fee and get access to the entire Knowdly library instantly.</div>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">2</div>
-            <div>
-              <div class="step-title">Read anything</div>
-              <div class="step-desc">Browse thousands of textbooks across every subject. Read in your browser — no downloads needed.</div>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">3</div>
-            <div>
-              <div class="step-title">Own what you buy</div>
-              <div class="step-desc">Purchase individual books as tokens and resell them when your course ends — just like a physical book.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-icon">📚</div>
-        <h3>For professors</h3>
-        <div class="steps">
-          <div class="step">
-            <div class="step-num">1</div>
-            <div>
-              <div class="step-title">Upload your content</div>
-              <div class="step-desc">Upload your textbook in minutes. Set your price and royalty rate. Keep full ownership of your work.</div>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">2</div>
-            <div>
-              <div class="step-title">Earn on every sale</div>
-              <div class="step-desc">Receive the full purchase price directly. No waiting, no quarterly statements, no surprises.</div>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">3</div>
-            <div>
-              <div class="step-title">Earn on every resale</div>
-              <div class="step-desc">Smart contracts automatically send you a royalty every time a student resells your book. Forever.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TECH STRIP -->
-    <div class="tech-strip">
-      <div class="tech-label">Built on permanent infrastructure</div>
-      <div class="tech-items">
-        <div class="tech-item">
-          <div class="tech-name">Stellar</div>
-          <div class="tech-role">Ownership + payments</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-name">Soroban</div>
-          <div class="tech-role">Smart contract royalties</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-name">Arweave</div>
-          <div class="tech-role">Permanent storage</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-name">AES-256</div>
-          <div class="tech-role">Content encryption</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-name">USDC</div>
-          <div class="tech-role">Stable payments</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- MISSION -->
-    <div class="mission">
-      <h2>All the knowledge. Finally affordable.</h2>
-      <p>
-        Knowdly is building the infrastructure for a fairer academic publishing system —
-        one where students pay less, professors earn more, and no single company
-        controls access to knowledge. Built in the open, owned by its community.
-      </p>
-      <div class="waitlist">
-        <input type="email" id="email-input-2" placeholder="your@university.edu" />
-        <button class="btn-primary" onclick="handleWaitlist2()">Join the waitlist</button>
-      </div>
-      <div class="success-msg" id="success-msg-2" style="margin-top:0.5rem;">
-        ✓ You're on the list — we'll be in touch soon.
-      </div>
-    </div>
-
+<section class="hero">
+  <div class="hero-badge">Now in development · Built on Stellar + Arweave</div>
+  <h1>Publish once.<br/><span class="gr">Own forever.</span></h1>
+  <p class="hero-sub">Sell your writing directly to readers. Earn royalties on every sale and every resale — automatically, forever — with no publisher taking the majority of your work's value.</p>
+  <div class="hero-actions">
+    <a href="#waitlist" class="btn-primary">Start publishing</a>
+    <a href="#how" class="btn-ghost">See how it works →</a>
   </div>
+  <div class="hero-stats">
+    <div class="stat-item"><div class="stat-num">97.5%</div><div class="stat-label">Goes to the creator</div></div>
+    <div class="stat-item"><div class="stat-num">∞</div><div class="stat-label">Resale royalties</div></div>
+    <div class="stat-item"><div class="stat-num">$0</div><div class="stat-label">To publish</div></div>
+    <div class="stat-item"><div class="stat-num">Instant</div><div class="stat-label">Payment speed</div></div>
+  </div>
+</section>
 
-  <!-- FOOTER -->
-  <footer>
-    <span>© 2026 Knowdly. All rights reserved.</span>
-    <span>All the knowledge. Finally affordable.</span>
-  </footer>
+<div class="ticker" aria-hidden="true">
+  <div class="ticker-inner">
+    <span class="ticker-item"><span class="ticker-dot"></span>Permanent storage on Arweave</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>USDC payments on Stellar</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>NFT ownership tokens</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>AES-256 encryption</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>On-chain royalties</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>No platform lock-in</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>Soroban smart contracts</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>Permanent storage on Arweave</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>USDC payments on Stellar</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>NFT ownership tokens</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>AES-256 encryption</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>On-chain royalties</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>No platform lock-in</span>
+    <span class="ticker-item"><span class="ticker-dot"></span>Soroban smart contracts</span>
+  </div>
+</div>
 
-  <script>
-    function handleWaitlist() {
-      const email = document.getElementById('email-input').value
-      if (!email || !email.includes('@')) {
-        document.getElementById('email-input').style.borderColor = '#f87171'
-        return
-      }
-      document.getElementById('email-input').style.borderColor = '#22c55e'
-      const msg = document.getElementById('success-msg')
-      msg.style.display = 'flex'
+<section class="who">
+  <div class="section-label">Who it's for</div>
+  <h2 class="section-title">Built for every kind of creator</h2>
+  <div class="who-grid">
+    <div class="who-card"><div class="who-icon">🎓</div><h3>Academic authors</h3><p>Stop giving your life's work to publishers who charge students $300 and pay you pennies. Set your own price. Earn directly.</p><span class="who-tag">Textbooks & research</span></div>
+    <div class="who-card"><div class="who-icon">✍️</div><h3>Independent writers</h3><p>Novels, essays, journalism, poetry. Publish without a gatekeeper. Your readers own their copy — you earn every time it changes hands.</p><span class="who-tag">Fiction & nonfiction</span></div>
+    <div class="who-card"><div class="who-icon">🛠️</div><h3>Technical creators</h3><p>Courses, documentation, playbooks. Sell knowledge that compounds. Readers who learn from your work become advocates who resell it.</p><span class="who-tag">Guides & courses</span></div>
+    <div class="who-card"><div class="who-icon">🏛️</div><h3>Institutions</h3><p>Universities, research labs, think tanks. Distribute with permanent verifiable provenance and built-in licensing.</p><span class="who-tag">Reports & papers</span></div>
+  </div>
+</section>
+
+<section class="how" id="how">
+  <div class="how-left">
+    <div class="section-label">How it works</div>
+    <h2 class="section-title" style="margin-bottom:1.25rem">Three steps. Everything else is automatic.</h2>
+    <p>Publishing on Knowdly is simple. Encryption, payments, royalties, and ownership are handled by infrastructure that runs automatically and that nobody can shut down.</p>
+  </div>
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-head"><div class="step-num-badge">1</div><h3>Upload your content</h3></div>
+      <p>Your file is encrypted in your browser using AES-256 before it leaves your device. The encrypted content is stored permanently on Arweave. Set your price, your royalty rate, and publish.</p>
+      <div class="step-tech"><span class="tech-chip">AES-256</span><span class="tech-chip">Arweave</span></div>
+    </div>
+    <div class="step-card">
+      <div class="step-head"><div class="step-num-badge">2</div><h3>Readers purchase ownership</h3></div>
+      <p>Readers pay in USDC via their Stellar wallet. You receive 97.5% of the purchase price instantly. A Soroban smart contract mints an NFT to the reader's wallet — permanent, on-chain proof of ownership.</p>
+      <div class="step-tech"><span class="tech-chip">USDC</span><span class="tech-chip">Stellar</span><span class="tech-chip">Soroban NFT</span></div>
+    </div>
+    <div class="step-card">
+      <div class="step-head"><div class="step-num-badge">3</div><h3>Earn on every resale, forever</h3></div>
+      <p>When a reader resells their copy, the smart contract enforces your royalty automatically — it cannot be bypassed. You set the rate when you publish. It applies to every transfer, forever.</p>
+      <div class="step-tech"><span class="tech-chip">On-chain royalties</span><span class="tech-chip">Automatic</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="economics" id="economics">
+  <div class="economics-inner">
+    <div class="economics-header">
+      <div class="section-label">The economics</div>
+      <h2 class="section-title" style="margin-bottom:0">Built for creators, not platforms</h2>
+    </div>
+    <div class="econ-grid">
+      <div class="econ-card"><div class="econ-number">97.5%</div><h3>Goes to you on every sale</h3><p>Knowdly takes a 2.5% platform fee. Everything else is yours — paid directly to your wallet the moment a reader purchases. No invoicing, no waiting, no minimums.</p></div>
+      <div class="econ-card"><div class="econ-number">∞</div><h3>Royalty on every resale</h3><p>You set your royalty rate when you publish. The smart contract enforces it on every transfer automatically. Your income compounds as your work circulates.</p></div>
+      <div class="econ-card"><div class="econ-number">$0</div><h3>To publish</h3><p>No subscription. No listing fee. A tiny Arweave storage cost — fractions of a cent for most documents — is the only cost to publish permanently.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="comparison">
+  <div class="section-label">How we compare</div>
+  <h2 class="section-title">The honest comparison</h2>
+  <div class="compare-wrap">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Traditional publishers</th>
+          <th>Amazon KDP</th>
+          <th>Substack</th>
+          <th class="knowdly-head">Knowdly ✦</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Creator revenue share</td><td>10–15%</td><td>35–70%</td><td>90%</td><td class="knowdly-col">97.5%</td></tr>
+        <tr><td>Resale royalties</td><td><span class="cross">✗ None</span></td><td><span class="cross">✗ None</span></td><td><span class="cross">✗ None</span></td><td class="knowdly-col"><span class="check">✓ Forever</span></td></tr>
+        <tr><td>Content permanently stored</td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td><td class="knowdly-col"><span class="check">✓ On Arweave</span></td></tr>
+        <tr><td>Reader truly owns their copy</td><td>Physical only</td><td><span class="cross">✗ Licence only</span></td><td><span class="cross">✗</span></td><td class="knowdly-col"><span class="check">✓ NFT ownership</span></td></tr>
+        <tr><td>Platform can remove content</td><td><span class="cross">✗ Yes</span></td><td><span class="cross">✗ Yes</span></td><td><span class="cross">✗ Yes</span></td><td class="knowdly-col"><span class="check">✓ Impossible</span></td></tr>
+        <tr><td>Payment speed</td><td>Quarterly</td><td>Monthly</td><td>Monthly</td><td class="knowdly-col">Instant</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="usecases" id="usecases">
+  <div class="section-label">What gets published</div>
+  <h2 class="section-title">Any written work. Any creator.</h2>
+  <div class="usecase-grid">
+    <div class="usecase-card"><span class="usecase-icon">📚</span><h3>Textbooks & course materials</h3><p>Academic authors selling directly to students at a fraction of publisher prices, while earning more per copy than any traditional deal offers.</p><div class="usecase-examples">Introduction to Machine Learning · Organic Chemistry · Constitutional Law</div></div>
+    <div class="usecase-card"><span class="usecase-icon">✍️</span><h3>Long-form journalism & essays</h3><p>Investigative pieces, essay collections, and reported narratives that deserve permanence — not a link that goes dead when a publication folds.</p><div class="usecase-examples">Deep dives · Annual reports · Essay anthologies</div></div>
+    <div class="usecase-card"><span class="usecase-icon">📖</span><h3>Fiction & literary writing</h3><p>Novels, novellas, short story collections. Readers who love your work can resell their copy to friends — and you earn every time.</p><div class="usecase-examples">Novels · Story collections · Poetry</div></div>
+    <div class="usecase-card"><span class="usecase-icon">🔬</span><h3>Research & white papers</h3><p>Academic papers and technical reports with permanent verifiable provenance. Know exactly who has access to your findings.</p><div class="usecase-examples">Working papers · Preprints · Industry analysis</div></div>
+    <div class="usecase-card"><span class="usecase-icon">🛠️</span><h3>Technical guides & playbooks</h3><p>How-to guides, developer documentation, and operational playbooks. Sell the knowledge that took you years to accumulate.</p><div class="usecase-examples">Engineering guides · Startup playbooks · Frameworks</div></div>
+    <div class="usecase-card"><span class="usecase-icon">🎓</span><h3>Educational content</h3><p>Curricula, lesson plans, and supplementary materials. Educators can finally monetise the teaching materials they spend thousands of hours creating.</p><div class="usecase-examples">Lesson plans · Study guides · Workbooks</div></div>
+  </div>
+</section>
+
+<div class="tech-strip">
+  <div class="tech-strip-inner">
+    <div>
+      <div class="section-label">Infrastructure</div>
+      <p>Built on permanent, trustless infrastructure. Your content survives regardless of what happens to any company — including us.</p>
+    </div>
+    <div class="tech-pills">
+      <div class="tech-pill"><strong>Arweave</strong><span>Permanent storage</span></div>
+      <div class="tech-pill"><strong>Stellar</strong><span>Payments</span></div>
+      <div class="tech-pill"><strong>Soroban</strong><span>Smart contracts</span></div>
+      <div class="tech-pill"><strong>USDC</strong><span>Stable payments</span></div>
+      <div class="tech-pill"><strong>AES-256</strong><span>Encryption</span></div>
+    </div>
+  </div>
+</div>
+
+<section class="waitlist" id="waitlist">
+  <div class="waitlist-glow"></div>
+  <div class="section-label">Early access</div>
+  <h2>Your writing deserves<br/><span class="gr">better economics</span></h2>
+  <p>Join the waitlist. Publishers get free uploads during beta. Readers get their first month free.</p>
+  <div class="waitlist-form">
+    <input type="email" id="email" placeholder="your@email.com" autocomplete="email"/>
+    <button id="join-btn" onclick="handleWaitlist()">Join waitlist</button>
+  </div>
+  <div class="form-feedback" id="feedback"></div>
+  <p class="waitlist-fine">No spam. No credit card. Unsubscribe any time.</p>
+</section>
+
+<footer>
+  <a href="/" class="logo">Know<span>dly</span></a>
+  <span>© 2026 Knowdly. All rights reserved.</span>
+  <span>Publish once. Own forever.</span>
+</footer>
+
+<script>
+  const SUPABASE_URL = 'https://rdriiyrcvdknkansuwny.supabase.co'
+  const SUPABASE_KEY = 'sb_publishable_Bv2ovB86PCcYnuThWiff6Q_x5iBL-oY'
+
+  async function handleWaitlist() {
+    const email    = document.getElementById('email').value.trim()
+    const btn      = document.getElementById('join-btn')
+    const feedback = document.getElementById('feedback')
+    const input    = document.getElementById('email')
+    if (!email || !email.includes('@') || !email.includes('.')) {
+      input.style.borderColor = 'var(--red)'
+      feedback.className = 'form-feedback feedback-error'
+      feedback.textContent = 'Please enter a valid email address.'
+      return
     }
-
-    function handleWaitlist2() {
-      const email = document.getElementById('email-input-2').value
-      if (!email || !email.includes('@')) {
-        document.getElementById('email-input-2').style.borderColor = '#f87171'
-        return
+    btn.disabled = true
+    btn.textContent = 'Joining...'
+    input.style.borderColor = 'var(--ac)'
+    feedback.textContent = ''
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/waitlist`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Prefer':'return=minimal'},
+        body: JSON.stringify({email, source:'landing'}),
+      })
+      if (res.status === 201) {
+        btn.textContent = "You're in ✓"
+        input.disabled = true
+        feedback.className = 'form-feedback feedback-success'
+        feedback.textContent = "✓ You're on the list — we'll be in touch."
+      } else if (res.status === 409) {
+        btn.disabled = false
+        btn.textContent = 'Join waitlist'
+        feedback.className = 'form-feedback feedback-dupe'
+        feedback.textContent = "You're already on the list. We'll be in touch!"
+      } else {
+        btn.disabled = false
+        btn.textContent = 'Join waitlist'
+        feedback.className = 'form-feedback feedback-error'
+        feedback.textContent = 'Something went wrong. Please try again.'
       }
-      document.getElementById('email-input-2').style.borderColor = '#22c55e'
-      const msg = document.getElementById('success-msg-2')
-      msg.style.display = 'flex'
+    } catch(err) {
+      btn.disabled = false
+      btn.textContent = 'Join waitlist'
+      feedback.className = 'form-feedback feedback-error'
+      feedback.textContent = 'Connection error. Please try again.'
     }
-  </script>
-
+  }
+  document.getElementById('email').addEventListener('keydown', e => { if(e.key==='Enter') handleWaitlist() })
+  document.getElementById('email').addEventListener('input', () => {
+    document.getElementById('email').style.borderColor = 'var(--border)'
+    const f = document.getElementById('feedback')
+    if(f.classList.contains('feedback-error')) f.textContent = ''
+  })
+</script>
 </body>
 </html>

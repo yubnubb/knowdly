@@ -40,7 +40,7 @@ export default function RootLayout({
                 Library
               </a>
               <a href="/upload" className="hover:text-white transition-colors">
-                For Professors
+                For Creators
               </a>
               <a
                 href="/upload"

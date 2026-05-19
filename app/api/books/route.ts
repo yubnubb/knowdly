@@ -7,56 +7,53 @@ import { NextRequest, NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// ArLocal GraphQL endpoint for local development
-// change to https://arweave.net/graphql for production
 const ARWEAVE_GRAPHQL = 'http://localhost:1984/graphql'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Tag = {
-  name:  string
-  value: string
-}
-
-type Node = {
-  id:   string
-  tags: Tag[]
-}
+type Tag = { name: string; value: string }
+type Node = { id: string; tags: Tag[] }
 
 type Book = {
-  txId:        string
-  title:       string
-  author:      string
-  isbn:        string
-  edition:     string
-  description: string
-  price:       string
-  royalty:     string
-  fileName:    string
-  contentType: string
+  txId:          string
+  title:         string
+  author:        string
+  isbn:          string
+  edition:       string
+  description:   string
+  price:         string
+  royalty:       string
+  fileName:      string
+  contentType:   string
+  contentFormat: string  // PDF | EPUB | TXT
+  contentMime:   string  // original MIME type for blob reconstruction
+  category:      string  // novel | textbook | etc.
 }
 
-// ── Helper ────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-// extract a tag value by name from a tags array
 function tag(tags: Tag[], name: string): string {
-  const found = tags.find(t => t.name === name)
-  return found ? found.value : ''
+  return tags.find(t => t.name === name)?.value || ''
 }
 
-// convert a raw Arweave node into a clean Book object
+// supports both old tag schema (Book-Title) and new schema (Title)
+// so uploads from before the tag rename still appear in the library
 function toBook(node: Node): Book {
+  const tags = node.tags
   return {
-    txId:        node.id,
-    title:       tag(node.tags, 'Book-Title'),
-    author:      tag(node.tags, 'Book-Author'),
-    isbn:        tag(node.tags, 'Book-ISBN'),
-    edition:     tag(node.tags, 'Book-Edition'),
-    description: tag(node.tags, 'Description'),
-    price:       tag(node.tags, 'Book-Price'),
-    royalty:     tag(node.tags, 'Book-Royalty'),
-    fileName:    tag(node.tags, 'File-Name'),
-    contentType: tag(node.tags, 'Content-Type'),
+    txId:          node.id,
+    title:         tag(tags, 'Title')        || tag(tags, 'Book-Title'),
+    author:        tag(tags, 'Author')       || tag(tags, 'Book-Author'),
+    isbn:          tag(tags, 'ISBN')         || tag(tags, 'Book-ISBN'),
+    edition:       tag(tags, 'Edition')      || tag(tags, 'Book-Edition'),
+    description:   tag(tags, 'Description'),
+    price:         tag(tags, 'Price')        || tag(tags, 'Book-Price'),
+    royalty:       tag(tags, 'Royalty')      || tag(tags, 'Book-Royalty'),
+    fileName:      tag(tags, 'File-Name'),
+    contentType:   tag(tags, 'Content-Type'),
+    contentFormat: tag(tags, 'Content-Format') || 'PDF',
+    contentMime:   tag(tags, 'Content-Mime')   || 'application/pdf',
+    category:      tag(tags, 'Category'),
   }
 }
 
@@ -65,13 +62,11 @@ function toBook(node: Node): Book {
 export async function GET(request: NextRequest) {
   try {
 
-    // optional search term from query string e.g. /api/books?search=quantum
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search') || ''
+    const search   = searchParams.get('search')   || ''
+    const category = searchParams.get('category') || ''
+    const format   = searchParams.get('format')   || ''
 
-    // fetch ALL transactions from ArLocal without tag filter
-    // ArLocal does not support tag filtering in GraphQL queries
-    // we filter by App-Name: Knowdly in JavaScript below
     const query = `
       query {
         transactions(
@@ -81,17 +76,13 @@ export async function GET(request: NextRequest) {
           edges {
             node {
               id
-              tags {
-                name
-                value
-              }
+              tags { name value }
             }
           }
         }
       }
     `
 
-    // send the GraphQL query to ArLocal
     const response = await fetch(ARWEAVE_GRAPHQL, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -105,33 +96,47 @@ export async function GET(request: NextRequest) {
     const json  = await response.json()
     const edges = json?.data?.transactions?.edges || []
 
-    // build books array — filter to only Knowdly books with a title
     let books: Book[] = []
 
     for (const edge of edges) {
       const node: Node = edge.node
 
-      // skip if not a Knowdly upload
+      // must be a Knowdly upload
       if (tag(node.tags, 'App-Name') !== 'Knowdly') continue
 
-      // skip if no title — not a book upload
-      const title = tag(node.tags, 'Book-Title')
+      // must have a title — supports both old and new tag names
+      const title = tag(node.tags, 'Title') || tag(node.tags, 'Book-Title')
       if (!title) continue
 
       books.push(toBook(node))
     }
 
-    // apply search filter if provided
+    // filter by search term
     if (search.trim()) {
       const term = search.toLowerCase()
       books = books.filter(b =>
-        b.title.toLowerCase().includes(term)  ||
-        b.author.toLowerCase().includes(term) ||
+        b.title.toLowerCase().includes(term)    ||
+        b.author.toLowerCase().includes(term)   ||
+        b.category.toLowerCase().includes(term) ||
         b.isbn.toLowerCase().includes(term)
       )
     }
 
-    console.log('Arweave query returned ' + books.length + ' books')
+    // filter by category
+    if (category.trim()) {
+      books = books.filter(b =>
+        b.category.toLowerCase() === category.toLowerCase()
+      )
+    }
+
+    // filter by format
+    if (format.trim()) {
+      books = books.filter(b =>
+        b.contentFormat.toLowerCase() === format.toLowerCase()
+      )
+    }
+
+    console.log(`Arweave query returned ${books.length} books`)
 
     return NextResponse.json({ books })
 

@@ -1,50 +1,90 @@
 // app/reader/[txId]/page.tsx
-// Book reader page — fetches content from ArLocal via our proxy API
-// URL: /reader/[arweave-transaction-id]
-
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { importKey, decryptFile } from '../../lib/crypto'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+type ContentFormat = 'PDF' | 'EPUB' | 'TXT'
 
 type BookMeta = {
-  txId:        string
-  title:       string
-  author:      string
-  isbn:        string
-  edition:     string
-  description: string
-  price:       string
-  royalty:     string
-  fileName:    string
-  contentType: string
+  txId:          string
+  title:         string
+  author:        string
+  isbn:          string
+  edition:       string
+  description:   string
+  price:         string
+  royalty:       string
+  fileName:      string
+  contentType:   string
+  contentFormat: ContentFormat
+  contentMime:   string
+  category:      string
 }
 
 type ReaderStatus = 'loading' | 'ready' | 'error'
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Arweave gateway — reads from env var set by Next.js at build time ─────────
+// Dev:        NEXT_PUBLIC_ARWEAVE_GATEWAY=http://localhost:1984
+// Production: NEXT_PUBLIC_ARWEAVE_GATEWAY=https://arweave.net
+const ARWEAVE_GATEWAY = process.env.NEXT_PUBLIC_ARWEAVE_GATEWAY ?? 'http://localhost:1984'
+
+// ── EPUB theme ────────────────────────────────────────────────────────────────
+const EPUB_THEME = {
+  body: {
+    background:    '#fafaf8',
+    color:         '#1a1a1a',
+    'font-family': 'Georgia, "Times New Roman", serif',
+    'font-size':   '1.05rem',
+    'line-height': '1.75',
+    padding:       '1rem 2rem',
+    margin:        '0',
+  },
+  p:   { margin: '0 0 1em 0' },
+  a:   { color: '#4f46e5' },
+  h1:  { color: '#111', 'font-size': '1.6rem',  margin: '1.5rem 0 1rem' },
+  h2:  { color: '#111', 'font-size': '1.3rem',  margin: '1.25rem 0 0.75rem' },
+  h3:  { color: '#111', 'font-size': '1.1rem',  margin: '1rem 0 0.5rem' },
+  img: { 'max-width': '100%', height: 'auto' },
+}
+
+function patchEpubSandbox(container: HTMLDivElement | null) {
+  if (!container) return
+  const iframe = container.querySelector('iframe')
+  if (!iframe) return
+  const existing = iframe.getAttribute('sandbox') ?? ''
+  if (!existing.includes('allow-scripts')) {
+    iframe.setAttribute('sandbox', (existing + ' allow-scripts allow-same-origin').trim())
+  }
+}
 
 export default function ReaderPage() {
+  const params = useParams()
+  const router = useRouter()
+  const txId   = params.txId as string
 
-  const params  = useParams()
-  const router  = useRouter()
-  const txId    = params.txId as string
+  const [status,     setStatus]     = useState<ReaderStatus>('loading')
+  const [meta,       setMeta]       = useState<BookMeta | null>(null)
+  const [error,      setError]      = useState<string | null>(null)
+  const [loadingMsg, setLoadingMsg] = useState('Loading book...')
 
-  const [status,    setStatus]    = useState<ReaderStatus>('loading')
-  const [meta,      setMeta]      = useState<BookMeta | null>(null)
-  const [pdfUrl,    setPdfUrl]    = useState<string | null>(null)
-  const [textBody,  setTextBody]  = useState<string | null>(null)
-  const [error,     setError]     = useState<string | null>(null)
-  const [fontSize,  setFontSize]  = useState(18)
-  const [darkMode,  setDarkMode]  = useState(true)
-  const [progress,  setProgress]  = useState(0)
+  const [pdfUrl,   setPdfUrl]   = useState<string | null>(null)
+  const [textBody, setTextBody] = useState<string | null>(null)
+  const [numPages, setNumPages] = useState(0)
+  const [pageNum,  setPageNum]  = useState(1)
 
-  useEffect(() => {
-    if (txId) fetchBook()
-  }, [txId])
+  const epubContainerRef = useRef<HTMLDivElement>(null)
+  const epubBookRef      = useRef<any>(null)
+  const epubRenditionRef = useRef<any>(null)
+  const [epubReady,   setEpubReady]   = useState(false)
+  const [epubChapter, setEpubChapter] = useState('')
+  const [epubAtStart, setEpubAtStart] = useState(true)
+  const [epubAtEnd,   setEpubAtEnd]   = useState(false)
+
+  const [fontSize, setFontSize] = useState(18)
+  const [darkMode, setDarkMode] = useState(true)
+  const [progress, setProgress] = useState(0)
 
   useEffect(() => {
     function onScroll() {
@@ -56,223 +96,276 @@ export default function ReaderPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // ── Fetch Book Data ───────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl) }
+  }, [pdfUrl])
 
-  async function fetchBook() {
+  useEffect(() => {
+    return () => {
+      try { epubRenditionRef.current?.destroy() } catch {}
+      try { epubBookRef.current?.destroy()      } catch {}
+    }
+  }, [])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!epubReady) return
+      if (e.key === 'ArrowRight') epubRenditionRef.current?.next()
+      if (e.key === 'ArrowLeft')  epubRenditionRef.current?.prev()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [epubReady])
+
+  const fetchBook = useCallback(async () => {
     setStatus('loading')
     setError(null)
+    setEpubReady(false)
+    setPdfUrl(null)
+    setTextBody(null)
+    setEpubChapter('')
+
+    try { epubRenditionRef.current?.destroy(); epubRenditionRef.current = null } catch {}
+    try { epubBookRef.current?.destroy();      epubBookRef.current = null      } catch {}
 
     try {
-
-      // ── Step 1: Fetch book metadata ──────────────────────────────────────
+      // Step 1: metadata
+      setLoadingMsg('Fetching book metadata...')
       const metaRes  = await fetch('/api/books')
       const metaData = await metaRes.json()
-      const found    = metaData.books?.find((b: BookMeta) => b.txId === txId)
-      if (found) setMeta(found)
+      const found: BookMeta | null = metaData.books?.find((b: BookMeta) => b.txId === txId) ?? null
+      setMeta(found)
+      const format: ContentFormat = found?.contentFormat ?? 'PDF'
+      const mime = found?.contentMime ?? 'application/pdf'
 
-      // ── Step 2: Fetch encrypted content from ArLocal ─────────────────────
-      console.log('Fetching encrypted content...')
-      const contentRes = await fetch(`http://localhost:1984/${txId}/data`)
-      console.log('Fetch complete, status:', contentRes.status)
-
-      if (!contentRes.ok) {
-        throw new Error('Could not load book content: ' + contentRes.status)
-      }
-
-      // read the body ONCE — a response body can only be read once
+      // Step 2: fetch encrypted content
+      // Uses NEXT_PUBLIC_ARWEAVE_GATEWAY — localhost:1984 in dev, arweave.net in prod
+      setLoadingMsg('Downloading encrypted content...')
+      const contentRes = await fetch(`${ARWEAVE_GATEWAY}/${txId}`)
+      if (!contentRes.ok) throw new Error('Could not fetch content: ' + contentRes.status)
       const encryptedBuffer = await contentRes.arrayBuffer()
-      console.log('Encrypted buffer size:', encryptedBuffer.byteLength)
+      console.log('Encrypted size:', encryptedBuffer.byteLength)
 
-      // ── Step 3: Get wallet address from Freighter ────────────────────────
-      console.log('Requesting decryption key...')
+      // Step 3: connect wallet
+      setLoadingMsg('Connecting wallet...')
       const { requestAccess } = await import('@stellar/freighter-api')
       const accessResult = await requestAccess()
+      if (accessResult.error) throw new Error('Please connect your Freighter wallet')
 
-      if (accessResult.error) {
-        throw new Error('Please connect your Freighter wallet to read this book')
-      }
-
-      // ── Step 4: Request decryption key from key server ───────────────────
-      // server verifies on-chain ownership before releasing the key
-      const keyResponse = await fetch(
+      // Step 4: verify ownership + get key
+      setLoadingMsg('Verifying ownership...')
+      const keyRes = await fetch(
         `/api/keys?arweaveTxId=${txId}&wallet=${accessResult.address}`
       )
-
-      if (!keyResponse.ok) {
-        const keyError = await keyResponse.json()
-        throw new Error(keyError.error || 'Could not retrieve decryption key')
+      if (!keyRes.ok) {
+        const e = await keyRes.json()
+        throw new Error(e.error || 'Could not retrieve decryption key')
       }
+      const { key: keyHex, iv } = await keyRes.json()
 
-      const { key: keyHex, iv } = await keyResponse.json()
-      console.log('Key received. Decrypting content...')
-
-      // ── Step 5: Decrypt the content ──────────────────────────────────────
+      // Step 5: decrypt in browser
+      setLoadingMsg('Decrypting...')
       const aesKey        = await importKey(keyHex)
       const decryptedData = await decryptFile(encryptedBuffer, aesKey, iv)
       console.log('Decrypted size:', decryptedData.byteLength)
 
-      // ── Step 6: Render the content ───────────────────────────────────────
-      // all uploads are encrypted PDFs — render as PDF blob
-      const blob = new Blob([decryptedData], { type: 'application/pdf' })
-      const url  = URL.createObjectURL(blob)
-      console.log('Blob created, size:', blob.size)
-      setPdfUrl(url)
-      setStatus('ready')
+      // Step 6: render
+      const fmt = format as string
+
+      if (fmt === 'EPUB') {
+        setLoadingMsg('Opening e-reader...')
+        setStatus('ready')
+        await new Promise(r => setTimeout(r, 80))
+
+        const ePub = (await import('epubjs')).default
+        if (!epubContainerRef.current) throw new Error('EPUB container not ready')
+
+        const book = ePub(decryptedData, { openAs: 'binary' })
+        epubBookRef.current = book
+
+        const rendition = book.renderTo(epubContainerRef.current, {
+          width:  '100%',
+          height: '100%',
+          flow:   'paginated',
+        })
+        epubRenditionRef.current = rendition
+
+        rendition.themes.default(EPUB_THEME)
+
+        rendition.on('rendered', (section: any) => {
+          patchEpubSandbox(epubContainerRef.current)
+          const item = book.navigation?.toc?.find(
+            (t: any) => t.href && section?.href && t.href.includes(section.href.split('/').pop())
+          )
+          setEpubChapter(item?.label?.trim() ?? '')
+        })
+
+        rendition.on('relocated', (location: any) => {
+          setEpubAtStart(!!location.atStart)
+          setEpubAtEnd(!!location.atEnd)
+        })
+
+        await rendition.display()
+        setEpubReady(true)
+
+      } else if (fmt === 'TXT') {
+        setTextBody(new TextDecoder().decode(decryptedData))
+        setStatus('ready')
+
+      } else {
+        const blob = new Blob([decryptedData], { type: mime })
+        setPdfUrl(URL.createObjectURL(blob))
+        setStatus('ready')
+      }
 
     } catch (err) {
       console.error('Reader error:', err)
       setError(err instanceof Error ? err.message : 'Failed to load book')
       setStatus('error')
     }
-  }
+  }, [txId])
 
-  // ── Styles ─────────────────────────────────────────────────────────────────
+  useEffect(() => { if (txId) fetchBook() }, [txId])
 
-  const bg         = darkMode ? 'bg-gray-950'   : 'bg-amber-50'
-  const textColor  = darkMode ? 'text-gray-100' : 'text-gray-900'
-  const barBg      = darkMode ? 'bg-gray-900'   : 'bg-white'
-  const barBorder  = darkMode ? 'border-gray-800' : 'border-gray-200'
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const format    = meta?.contentFormat ?? 'PDF'
+  const bg        = darkMode ? 'bg-gray-950'     : 'bg-amber-50'
+  const tx        = darkMode ? 'text-gray-100'   : 'text-gray-900'
+  const barBg     = darkMode ? 'bg-gray-900'     : 'bg-white'
+  const barBorder = darkMode ? 'border-gray-800' : 'border-gray-200'
 
   return (
-    <div className={`min-h-screen ${bg} ${textColor} transition-colors duration-200`}>
+    <div className={`min-h-screen ${bg} ${tx} transition-colors duration-200`}>
 
-      {/* ── TOP TOOLBAR ───────────────────────────────────────────────────── */}
       <div className={`fixed top-0 left-0 right-0 z-50 ${barBg} border-b ${barBorder}`}>
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-4">
 
-          {/* back to library */}
           <button
             onClick={() => router.push('/library')}
-            className="text-gray-400 hover:text-white transition-colors text-sm"
+            className="text-gray-400 hover:text-white transition-colors text-sm flex-shrink-0"
           >
             ← Library
           </button>
 
-          {/* book info */}
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium truncate">
-              {meta?.title || 'Loading...'}
-            </div>
+            <div className="text-sm font-medium truncate">{meta?.title || 'Loading...'}</div>
             {meta?.author && (
-              <div className="text-xs text-gray-500">{meta.author}</div>
+              <div className="text-xs text-gray-500 truncate">{meta.author}</div>
             )}
           </div>
 
-          {/* controls */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setFontSize(s => Math.max(12, s - 2))}
-              className="text-xs text-gray-400 hover:text-white w-7 h-7 border border-gray-700 rounded flex items-center justify-center transition-colors"
-            >
-              A-
-            </button>
-            <button
-              onClick={() => setFontSize(s => Math.min(28, s + 2))}
-              className="text-xs text-gray-400 hover:text-white w-7 h-7 border border-gray-700 rounded flex items-center justify-center transition-colors"
-            >
-              A+
-            </button>
-            <button
-              onClick={() => setDarkMode(d => !d)}
-              className="text-xs text-gray-400 hover:text-white w-7 h-7 border border-gray-700 rounded flex items-center justify-center transition-colors"
-            >
-              {darkMode ? '☀' : '☾'}
+          {format === 'EPUB' && epubChapter && (
+            <div className="text-xs text-gray-500 truncate max-w-xs hidden md:block">
+              {epubChapter}
+            </div>
+          )}
+
+          {meta?.contentFormat && (
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded flex-shrink-0 ${
+              format === 'EPUB' ? 'bg-purple-900 text-purple-300' :
+              format === 'PDF'  ? 'bg-indigo-900 text-indigo-300' :
+                                  'bg-gray-800 text-gray-400'
+            }`}>
+              {format}
+            </span>
+          )}
+
+          {format === 'EPUB' && epubReady && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={() => epubRenditionRef.current?.prev()} disabled={epubAtStart} className="text-gray-400 hover:text-white disabled:opacity-30 w-7 h-7 border border-gray-700 rounded flex items-center justify-center transition-colors">‹</button>
+              <button onClick={() => epubRenditionRef.current?.next()} disabled={epubAtEnd}   className="text-gray-400 hover:text-white disabled:opacity-30 w-7 h-7 border border-gray-700 rounded flex items-center justify-center transition-colors">›</button>
+            </div>
+          )}
+
+          {status === 'ready' && format === 'PDF' && numPages > 0 && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={() => setPageNum(p => Math.max(1, p - 1))} disabled={pageNum <= 1} className="text-gray-400 hover:text-white disabled:opacity-30 w-7 h-7 border border-gray-700 rounded flex items-center justify-center">‹</button>
+              <span className="text-gray-400 text-xs w-20 text-center">{pageNum} / {numPages}</span>
+              <button onClick={() => setPageNum(p => Math.min(numPages, p + 1))} disabled={pageNum >= numPages} className="text-gray-400 hover:text-white disabled:opacity-30 w-7 h-7 border border-gray-700 rounded flex items-center justify-center">›</button>
+            </div>
+          )}
+
+          {status === 'ready' && format === 'TXT' && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={() => setFontSize(s => Math.max(12, s - 2))} className="text-xs text-gray-400 hover:text-white w-7 h-7 border border-gray-700 rounded flex items-center justify-center">A-</button>
+              <button onClick={() => setFontSize(s => Math.min(28, s + 2))} className="text-xs text-gray-400 hover:text-white w-7 h-7 border border-gray-700 rounded flex items-center justify-center">A+</button>
+              <button onClick={() => setDarkMode(d => !d)} className="text-xs text-gray-400 hover:text-white w-7 h-7 border border-gray-700 rounded flex items-center justify-center">
+                {darkMode ? '☀' : '☾'}
+              </button>
+              <span className="text-xs text-gray-500 w-10 text-right">{progress}%</span>
+            </div>
+          )}
+        </div>
+
+        {format === 'TXT' && (
+          <div className="absolute bottom-0 left-0 h-0.5 bg-indigo-500 transition-all duration-150" style={{ width: progress + '%' }} />
+        )}
+      </div>
+
+      <div className={format === 'EPUB' ? 'pt-14 h-screen' : 'pt-20 pb-20'}>
+
+        {status === 'loading' && (
+          <div className="flex flex-col items-center justify-center py-40">
+            <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <div className="text-gray-400 text-sm">{loadingMsg}</div>
+          </div>
+        )}
+
+        {status === 'error' && (
+          <div className="max-w-2xl mx-auto px-6 text-center py-40">
+            <div className="text-5xl mb-4">📕</div>
+            <div className="text-red-400 font-medium mb-2">Could not load book</div>
+            <div className="text-gray-500 text-sm mb-6">{error}</div>
+            <button onClick={fetchBook} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg text-sm transition-colors">
+              Try again
             </button>
           </div>
+        )}
 
-          {/* progress */}
-          <span className="text-xs text-gray-500 w-10 text-right">
-            {progress}%
-          </span>
-        </div>
+        {status === 'ready' && format === 'EPUB' && (
+          <div className="relative w-full" style={{ height: 'calc(100vh - 56px)' }}>
+            <div ref={epubContainerRef} className="w-full h-full bg-white" style={{ height: 'calc(100vh - 56px)' }} />
+            <button onClick={() => epubRenditionRef.current?.prev()} disabled={epubAtStart} className="absolute left-0 top-0 h-full w-16 flex items-center justify-center text-gray-400 hover:text-gray-700 disabled:opacity-0 transition-colors z-10" aria-label="Previous page">
+              <span className="text-4xl select-none">‹</span>
+            </button>
+            <button onClick={() => epubRenditionRef.current?.next()} disabled={epubAtEnd} className="absolute right-0 top-0 h-full w-16 flex items-center justify-center text-gray-400 hover:text-gray-700 disabled:opacity-0 transition-colors z-10" aria-label="Next page">
+              <span className="text-4xl select-none">›</span>
+            </button>
+          </div>
+        )}
 
-        {/* progress bar */}
-        <div
-          className="absolute bottom-0 left-0 h-0.5 bg-indigo-500 transition-all duration-150"
-          style={{ width: progress + '%' }}
-        />
+        {status === 'ready' && format === 'PDF' && pdfUrl && (
+          <div className="max-w-3xl mx-auto px-4">
+            {meta && (
+              <div className="mb-8 pb-6 border-b border-gray-800">
+                <h1 className="text-2xl font-bold mb-1">{meta.title}</h1>
+                <p className="text-gray-400">{meta.author}{meta.edition ? ' · ' + meta.edition + ' edition' : ''}</p>
+                {meta.isbn && <p className="text-gray-600 text-xs mt-1">ISBN {meta.isbn}</p>}
+              </div>
+            )}
+            <div className="w-full rounded-xl overflow-hidden border border-gray-800">
+              <iframe src={pdfUrl} className="w-full" style={{ height: '80vh' }} title={meta?.title || 'Book'} />
+            </div>
+          </div>
+        )}
+
+        {status === 'ready' && format === 'TXT' && textBody && (
+          <div className="max-w-2xl mx-auto px-6">
+            {meta && (
+              <div className="mb-10 pb-8 border-b border-gray-800">
+                <h1 className="font-bold leading-tight mb-2" style={{ fontSize: fontSize + 8 + 'px' }}>{meta.title}</h1>
+                <p className="text-gray-400">{meta.author}{meta.edition ? ' · ' + meta.edition + ' edition' : ''}</p>
+                {meta.isbn && <p className="text-gray-600 text-xs mt-1">ISBN {meta.isbn}</p>}
+              </div>
+            )}
+            <div className="leading-relaxed whitespace-pre-wrap font-serif" style={{ fontSize: fontSize + 'px' }}>
+              {textBody}
+            </div>
+          </div>
+        )}
+
       </div>
 
-      {/* ── CONTENT ───────────────────────────────────────────────────────── */}
-      <div className="pt-20 pb-20">
-        <div className="max-w-2xl mx-auto px-6">
-
-          {/* loading */}
-          {status === 'loading' && (
-            <div className="flex flex-col items-center justify-center py-40">
-              <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <div className="text-gray-400 text-sm">Loading book...</div>
-            </div>
-          )}
-
-          {/* error */}
-          {status === 'error' && (
-            <div className="text-center py-40">
-              <div className="text-5xl mb-4">📕</div>
-              <div className="text-red-400 font-medium mb-2">Could not load book</div>
-              <div className="text-gray-500 text-sm mb-6">{error}</div>
-              <button
-                onClick={fetchBook}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg text-sm transition-colors"
-              >
-                Try again
-              </button>
-            </div>
-          )}
-
-          {/* ready */}
-          {status === 'ready' && (
-            <>
-              {/* book header */}
-              {meta && (
-                <div className="mb-10 pb-8 border-b border-gray-800">
-                  <h1
-                    className="font-bold leading-tight mb-2"
-                    style={{ fontSize: fontSize + 8 + 'px' }}
-                  >
-                    {meta.title}
-                  </h1>
-                  <p className="text-gray-400">
-                    {meta.author}
-                    {meta.edition ? ' · ' + meta.edition + ' edition' : ''}
-                  </p>
-                  {meta.isbn && (
-                    <p className="text-gray-600 text-xs mt-1">ISBN {meta.isbn}</p>
-                  )}
-                </div>
-              )}
-
-              {/* PDF viewer */}
-              {pdfUrl && (
-                <div className="w-full rounded-xl overflow-hidden border border-gray-800">
-                  <iframe
-                    src={pdfUrl}
-                    className="w-full"
-                    style={{ height: '80vh' }}
-                    title={meta?.title || 'Book'}
-                  />
-                </div>
-              )}
-
-              {/* text viewer */}
-              {textBody && (
-                <div
-                  className="leading-relaxed whitespace-pre-wrap font-serif"
-                  style={{ fontSize: fontSize + 'px' }}
-                >
-                  {textBody}
-                </div>
-              )}
-            </>
-          )}
-
-        </div>
-      </div>
-
-      {/* ── BOTTOM BAR ────────────────────────────────────────────────────── */}
-      {status === 'ready' && meta && (
+      {status === 'ready' && meta && format === 'TXT' && (
         <div className={`fixed bottom-0 left-0 right-0 ${barBg} border-t ${barBorder} px-4 py-2`}>
           <div className="max-w-4xl mx-auto flex justify-between text-xs text-gray-500">
             <span className="truncate">{meta.title}</span>

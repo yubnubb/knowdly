@@ -1,11 +1,14 @@
 // app/api/keys/route.ts
 // Server-side key management — stores and releases AES-256 encryption keys
 // Keys are only released to wallets that own the corresponding Soroban NFT
-// Keys persist to a file so they survive server restarts
+// Keys persist to Supabase PostgreSQL — survives server restarts and deployments
+//
+// Requires in .env.local:
+//   SUPABASE_URL=https://your-project.supabase.co
+//   SUPABASE_SERVICE_KEY=your_service_role_key
 
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFileSync, readFileSync, existsSync } from 'fs'
-import { join } from 'path'
+import { createClient } from '@supabase/supabase-js'
 import {
   Contract,
   Networks,
@@ -20,59 +23,26 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// ── File-based key store ──────────────────────────────────────────────────────
-// Keys persist to a JSON file so they survive server restarts
-// In production use a proper database like PostgreSQL or Redis
+// ── Supabase client (server-side only) ───────────────────────────────────────
+// Uses the service role key which bypasses RLS
+// NEVER expose this key in the browser
 
-const KEY_STORE_PATH = join(process.cwd(), '.keystore.json')
+function getSupabase() {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_KEY
 
-type KeyEntry = {
-  bookId:      number
-  arweaveTxId: string
-  key:         string
-  iv:          string
-}
-
-// load all keys from the JSON file
-function loadKeyStore(): Record<string, KeyEntry> {
-  try {
-    if (existsSync(KEY_STORE_PATH)) {
-      const data = readFileSync(KEY_STORE_PATH, 'utf-8')
-      return JSON.parse(data)
-    }
-  } catch (err) {
-    console.error('Error loading key store:', err)
+  if (!url || !key) {
+    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment')
   }
-  return {}
-}
 
-// save all keys to the JSON file
-function saveKeyStore(store: Record<string, KeyEntry>): void {
-  try {
-    writeFileSync(KEY_STORE_PATH, JSON.stringify(store, null, 2))
-  } catch (err) {
-    console.error('Error saving key store:', err)
-  }
-}
-
-// get a single key entry by Arweave TX ID
-function getKey(arweaveTxId: string): KeyEntry | undefined {
-  const store = loadKeyStore()
-  return store[arweaveTxId]
-}
-
-// store a single key entry by Arweave TX ID
-function setKey(arweaveTxId: string, entry: KeyEntry): void {
-  const store = loadKeyStore()
-  store[arweaveTxId] = entry
-  saveKeyStore(store)
+  return createClient(url, key)
 }
 
 // ── Stellar RPC config ────────────────────────────────────────────────────────
 
 const RPC_URL     = 'https://soroban-testnet.stellar.org'
 const NETWORK     = Networks.TESTNET
-const CONTRACT_ID = 'CDZUALFCYWLHFDST3GY675CG3EXHLMODU2T24T5GECY3HYDR44XXCTDD'
+const CONTRACT_ID = 'CATPB6WUFQXBU6Q3HWFNGPOBKLYSVTCKCMX25LZOIEMQQP4LXKKRR4YX'
 
 // ── Verify ownership on-chain ─────────────────────────────────────────────────
 // calls owns_book() on the Soroban contract
@@ -93,8 +63,8 @@ async function verifyOwnership(
       .addOperation(
         contract.call(
           'owns_book',
-          nativeToScVal(walletAddress,   { type: 'address' }),
-          nativeToScVal(BigInt(bookId),  { type: 'u64' }),
+          nativeToScVal(walletAddress,  { type: 'address' }),
+          nativeToScVal(BigInt(bookId), { type: 'u64' }),
         )
       )
       .setTimeout(30)
@@ -125,8 +95,8 @@ async function verifyOwnership(
 }
 
 // ── POST /api/keys ────────────────────────────────────────────────────────────
-// Called by the upload page after successful Arweave upload and book registration
-// Stores the AES key tied to the Soroban book ID
+// Called by the upload page after successful Arweave upload + book registration
+// Stores the AES key tied to the Soroban book ID in Supabase
 // Body: { arweaveTxId, bookId, key, iv }
 
 export async function POST(request: NextRequest) {
@@ -141,8 +111,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // store the key in the persistent file store
-    setKey(arweaveTxId, { bookId, arweaveTxId, key, iv })
+    const supabase = getSupabase()
+
+    // upsert — if a key already exists for this txId, update it
+    // handles re-uploads cleanly
+    const { error } = await supabase
+      .from('keys')
+      .upsert(
+        { arweave_tx_id: arweaveTxId, book_id: bookId, key, iv },
+        { onConflict: 'arweave_tx_id' }
+      )
+
+    if (error) {
+      console.error('Supabase key storage error:', error)
+      return NextResponse.json(
+        { error: 'Failed to store key: ' + error.message },
+        { status: 500 }
+      )
+    }
 
     console.log(`Key stored for book ID ${bookId}, Arweave TX: ${arweaveTxId}`)
 
@@ -158,7 +144,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ── GET /api/keys ─────────────────────────────────────────────────────────────
-// Called by the reader page when a student opens a book
+// Called by the reader page when a user opens a book
 // Verifies on-chain ownership before releasing the decryption key
 // Params: ?arweaveTxId=xxx&wallet=Gxxx
 
@@ -175,10 +161,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // look up the key from the persistent store
-    const entry = getKey(arweaveTxId)
+    const supabase = getSupabase()
 
-    if (!entry) {
+    // look up the key from Supabase
+    const { data, error } = await supabase
+      .from('keys')
+      .select('book_id, key, iv')
+      .eq('arweave_tx_id', arweaveTxId)
+      .single()
+
+    if (error || !data) {
       return NextResponse.json(
         { error: 'Key not found for this book' },
         { status: 404 }
@@ -187,9 +179,9 @@ export async function GET(request: NextRequest) {
 
     // verify the wallet owns this book on-chain via Soroban
     console.log(
-      `Checking ownership: wallet ${walletAddress} for book ID ${entry.bookId}`
+      `Checking ownership: wallet ${walletAddress} for book ID ${data.book_id}`
     )
-    const owns = await verifyOwnership(walletAddress, entry.bookId)
+    const owns = await verifyOwnership(walletAddress, data.book_id)
 
     if (!owns) {
       return NextResponse.json(
@@ -200,12 +192,12 @@ export async function GET(request: NextRequest) {
 
     // ownership confirmed — release the decryption key
     console.log(
-      `Key released for book ID ${entry.bookId} to wallet ${walletAddress}`
+      `Key released for book ID ${data.book_id} to wallet ${walletAddress}`
     )
 
     return NextResponse.json({
-      key: entry.key,
-      iv:  entry.iv,
+      key: data.key,
+      iv:  data.iv,
     })
 
   } catch (err) {
