@@ -158,18 +158,23 @@ export default function LibraryPage() {
     const onChainOwned = new Set<string>()
 
     await Promise.all(tokenIds.map(async id => {
-      const token = await getToken(walletAddr, id)
-      console.log('Token:', id, '→ bookId:', token?.bookId)
-      if (!token) return
+  try {
+    console.log('Fetching token:', id)
+    const token = await getToken(walletAddr, id)
+    console.log('Token result:', id, token)
+    if (!token) return
 
-      // get arweaveTxId directly from contract — no localStorage needed
-      const arweaveTxId = await getBookArweaveTxId(walletAddr, token.bookId)
-      console.log('ArweaveTxId for bookId', token.bookId, ':', arweaveTxId)
-      if (arweaveTxId) {
-        onChainOwned.add(arweaveTxId)
-        console.log('NFT ownership confirmed:', token.id, '→', arweaveTxId)
-      }
-    }))
+    console.log('Fetching arweaveTxId for bookId:', token.bookId)
+    const arweaveTxId = await getBookArweaveTxId(walletAddr, token.bookId)
+    console.log('ArweaveTxId result:', arweaveTxId)
+    
+    if (arweaveTxId) {
+      onChainOwned.add(arweaveTxId)
+    }
+  } catch (err) {
+    console.error('Error processing token', id, ':', err)
+  }
+}))
 
     if (onChainOwned.size > 0) {
       setOwnedBooks(prev => {
