@@ -434,3 +434,41 @@ export async function ownsBook(
     return false
   }
 }
+
+// ── getBookArweaveTxId ───────────────────────────────────────────────────────
+// Returns the Arweave TX ID for a given bookId by calling the contract's get_book method.
+// Used to link on-chain book records to their corresponding Arweave metadata/content.
+
+export async function getBookArweaveTxId(
+  callerAddress: string,
+  bookId: number,
+): Promise<string | null> {
+  const contract = new Contract(CONTRACT_ID)
+  const account  = new Account(callerAddress, '0')
+
+  const transaction = new TransactionBuilder(account, {
+    fee:               BASE_FEE,
+    networkPassphrase: NETWORK,
+  })
+    .addOperation(
+      contract.call(
+        'get_book',
+        nativeToScVal(BigInt(bookId), { type: 'u64' }),
+      )
+    )
+    .setTimeout(30)
+    .build()
+
+  const simData = await simulateOnly(transaction)
+  if (simData.result?.error) return null
+
+  try {
+    const returnVal = simData.result?.results?.[0]?.xdr
+    if (!returnVal) return null
+    const scVal  = xdr.ScVal.fromXDR(returnVal, 'base64')
+    const native = scValToNative(scVal) as any
+    return native?.arweave_tx_id ?? null
+  } catch {
+    return null
+  }
+}

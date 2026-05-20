@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import PurchaseModal from '../components/PurchaseModal'
-import { getTokensByOwner, getToken, getTotalBooks } from '../lib/contract'
+import { getTokensByOwner, getToken, getBookArweaveTxId } from '../lib/contract'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -149,56 +149,38 @@ export default function LibraryPage() {
   // Works on any device — no localStorage dependency for ownership discovery
 
   async function checkOnChainOwnership(walletAddr: string, bookList: Book[]) {
-    try {
-      console.log('Checking on-chain ownership for', walletAddr)
+  try {
+    // get all token IDs owned by this wallet — pure on-chain NFT lookup
+    const tokenIds = await getTokensByOwner(walletAddr)
+    if (tokenIds.length === 0) return
 
-      // get all token IDs owned by this wallet
-      const tokenIds = await getTokensByOwner(walletAddr)
-      if (tokenIds.length === 0) return
-      console.log('Owned token IDs:', tokenIds)
+    // for each token get the bookId, then get the arweaveTxId from the contract
+    const onChainOwned = new Set<string>()
 
-      // get each token to find its bookId
-      const tokens = await Promise.all(
-        tokenIds.map(id => getToken(walletAddr, id))
-      )
+    await Promise.all(tokenIds.map(async id => {
+      const token = await getToken(walletAddr, id)
+      if (!token) return
 
-      // build bookId → txId map from localStorage + current book list
-      const bookIdMap    = JSON.parse(localStorage.getItem('knowdly_book_ids') || '{}')
-      const bookIdToTxId = new Map<number, string>()
-
-      for (const [txId, bookId] of Object.entries(bookIdMap)) {
-        bookIdToTxId.set(Number(bookId), txId as string)
+      // get arweaveTxId directly from contract — no localStorage needed
+      const arweaveTxId = await getBookArweaveTxId(walletAddr, token.bookId)
+      if (arweaveTxId) {
+        onChainOwned.add(arweaveTxId)
+        console.log('NFT ownership confirmed:', token.id, '→', arweaveTxId)
       }
-      for (const book of bookList) {
-        const localBookId = bookIdMap[book.txId]
-        if (localBookId !== undefined) {
-          bookIdToTxId.set(Number(localBookId), book.txId)
-        }
-      }
+    }))
 
-      // build set of owned txIds from tokens
-      const onChainOwned = new Set<string>()
-      for (const token of tokens) {
-        if (!token) continue
-        const txId = bookIdToTxId.get(token.bookId)
-        if (txId) {
-          onChainOwned.add(txId)
-          console.log('Owns book via token:', token.id, '→ txId:', txId)
-        }
-      }
-
-      if (onChainOwned.size > 0) {
-        setOwnedBooks(prev => {
-          const updated = new Set([...prev, ...onChainOwned])
-          const key = `knowdly_owned_books_${walletAddr}`
-          localStorage.setItem(key, JSON.stringify(Array.from(updated)))
-          return updated
-        })
-      }
-    } catch (err) {
-      console.error('On-chain ownership check failed:', err)
+    if (onChainOwned.size > 0) {
+      setOwnedBooks(prev => {
+        const updated = new Set([...prev, ...onChainOwned])
+        const key = `knowdly_owned_books_${walletAddr}`
+        localStorage.setItem(key, JSON.stringify(Array.from(updated)))
+        return updated
+      })
     }
+  } catch (err) {
+    console.error('On-chain ownership check failed:', err)
   }
+}
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
