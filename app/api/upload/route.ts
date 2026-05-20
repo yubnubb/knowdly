@@ -1,27 +1,31 @@
 // app/api/upload/route.ts
 // Server-side API route that handles Arweave uploads
-// Uses environment variables so the same code works in dev and production
+// Uses dual indexing — writes to both Arweave tags and Supabase on every upload:
 //
-// .env.local (dev):
-//   ARWEAVE_HOST=localhost
-//   ARWEAVE_PORT=1984
-//   ARWEAVE_PROTOCOL=http
-//   ARWEAVE_JWK=        ← leave empty, ArLocal auto-funds
+//   ┌─────────────────────────────────────────────────────┐
+//   │  DECENTRALISED INDEX — Arweave tags                 │
+//   │  Permanent, censorship-resistant, always available  │
+//   │  Queried via GraphQL (10-30min indexing delay)      │
+//   └─────────────────────────────────────────────────────┘
+//   ┌─────────────────────────────────────────────────────┐
+//   │  CENTRALISED INDEX — Supabase books table           │
+//   │  Fast, instant, queryable immediately after upload  │
+//   │  Cache only — Arweave is the source of truth        │
+//   └─────────────────────────────────────────────────────┘
 //
-// Production env vars:
-//   ARWEAVE_HOST=arweave.net
-//   ARWEAVE_PORT=443
-//   ARWEAVE_PROTOCOL=https
-//   ARWEAVE_JWK={"kty":"RSA",...}  ← your funded wallet JWK
+// Environment variables:
+//   ARWEAVE_HOST, ARWEAVE_PORT, ARWEAVE_PROTOCOL, ARWEAVE_JWK
+//   SUPABASE_URL, SUPABASE_SERVICE_KEY
 
 import { NextRequest, NextResponse } from 'next/server'
 import Arweave from 'arweave'
+import { createClient } from '@supabase/supabase-js'
 
-export const runtime   = 'nodejs'
-export const dynamic   = 'force-dynamic'
+export const runtime     = 'nodejs'
+export const dynamic     = 'force-dynamic'
 export const maxDuration = 60
 
-// ── Arweave config from environment ──────────────────────────────────────────
+// ── Arweave config ────────────────────────────────────────────────────────────
 
 const ARWEAVE_HOST     = process.env.ARWEAVE_HOST     ?? 'localhost'
 const ARWEAVE_PORT     = parseInt(process.env.ARWEAVE_PORT ?? '1984')
@@ -29,7 +33,17 @@ const ARWEAVE_PROTOCOL = process.env.ARWEAVE_PROTOCOL ?? 'http'
 const ARWEAVE_GATEWAY  = `${ARWEAVE_PROTOCOL}://${ARWEAVE_HOST}${ARWEAVE_PORT !== 443 && ARWEAVE_PORT !== 80 ? ':' + ARWEAVE_PORT : ''}`
 const IS_LOCAL         = ARWEAVE_HOST === 'localhost'
 
-// POST /api/upload
+// ── Supabase client (server-side only) ───────────────────────────────────────
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_KEY
+  if (!url || !key) throw new Error('Missing Supabase env vars')
+  return createClient(url, key)
+}
+
+// ── POST /api/upload ──────────────────────────────────────────────────────────
+
 export async function POST(request: NextRequest) {
   try {
 
@@ -42,7 +56,6 @@ export async function POST(request: NextRequest) {
 
     console.log('Received file name:', file.name)
     console.log('Received file size:', file.size)
-    console.log('Received file type:', file.type)
 
     const title         = formData.get('title')         as string || ''
     const author        = formData.get('author')        as string || ''
@@ -65,7 +78,8 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const fileBuffer  = Buffer.from(arrayBuffer)
 
-    // initialise Arweave from environment variables
+    // ── Initialise Arweave ────────────────────────────────────────────────────
+
     const arweave = Arweave.init({
       host:     ARWEAVE_HOST,
       port:     ARWEAVE_PORT,
@@ -73,13 +87,14 @@ export async function POST(request: NextRequest) {
     })
 
     // ── Wallet setup ──────────────────────────────────────────────────────────
-    // Dev:        generate a throwaway wallet and auto-fund via ArLocal faucet
-    // Production: use the funded wallet from ARWEAVE_JWK env var
+    // Dev:        throwaway wallet auto-funded via ArLocal faucet
+    // Production: funded wallet from ARWEAVE_JWK env var
+
     let jwk: any
 
     if (IS_LOCAL) {
-      jwk             = await arweave.wallets.generate()
-      const address   = await arweave.wallets.getAddress(jwk)
+      jwk           = await arweave.wallets.generate()
+      const address = await arweave.wallets.getAddress(jwk)
       await fetch(`${ARWEAVE_GATEWAY}/mint/${address}/1000000000000`)
       await fetch(`${ARWEAVE_GATEWAY}/mine`)
       console.log('ArLocal: funded throwaway wallet', address)
@@ -93,11 +108,16 @@ export async function POST(request: NextRequest) {
 
     const transaction = await arweave.createTransaction({ data: fileBuffer }, jwk)
 
-    // ── Arweave tags ─────────────────────────────────────────────────────────
+    // ── DECENTRALISED INDEX — Arweave tags ────────────────────────────────────
+    // These tags are permanently attached to the transaction on Arweave.
+    // They are the source of truth for all book metadata.
+    // Queryable via GraphQL at https://arweave.net/graphql
+    // Note: new transactions take 10-30 minutes to appear in the GraphQL index.
+
     transaction.addTag('Content-Type',    'application/octet-stream')
     transaction.addTag('App-Name',        'Knowdly')
-    transaction.addTag('Content-Format',  contentFormat)
-    transaction.addTag('Content-Mime',    contentMime)
+    transaction.addTag('Content-Format',  contentFormat)   // PDF | EPUB | TXT
+    transaction.addTag('Content-Mime',    contentMime)     // original MIME type
     transaction.addTag('Title',           title)
     transaction.addTag('Author',          author)
     transaction.addTag('Category',        category)
@@ -110,7 +130,9 @@ export async function POST(request: NextRequest) {
 
     await arweave.transactions.sign(transaction, jwk)
 
-    // ── Chunked upload ────────────────────────────────────────────────────────
+    // ── Chunked upload to Arweave ─────────────────────────────────────────────
+    // Handles files of any size — required for files over 256KB on mainnet
+
     const uploader = await arweave.transactions.getUploader(transaction)
 
     while (!uploader.isComplete) {
@@ -121,12 +143,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // mine immediately in dev so GraphQL indexes it
+    // mine immediately in dev so ArLocal GraphQL indexes it
     if (IS_LOCAL) {
       await fetch(`${ARWEAVE_GATEWAY}/mine`)
     }
 
     console.log('Arweave upload successful. TX ID:', transaction.id)
+
+    // ── CENTRALISED INDEX — Supabase books table ──────────────────────────────
+    // Write book metadata to Supabase immediately after Arweave upload.
+    // This allows the library to show the book instantly without waiting
+    // for Arweave's GraphQL indexer (which takes 10-30 minutes on mainnet).
+    //
+    // This is a cache only — Arweave tags are the source of truth.
+    // If Supabase fails, the book still exists on Arweave permanently.
+    // The library falls back to Arweave GraphQL if Supabase is unavailable.
+
+    try {
+      const supabase = getSupabase()
+      const { error: dbError } = await supabase
+        .from('books')
+        .upsert(
+          {
+            arweave_tx_id:  transaction.id,
+            title,
+            author,
+            category,
+            content_format: contentFormat,
+            content_mime:   contentMime,
+            price,
+            royalty,
+            isbn,
+            edition,
+            description,
+            file_name:      file.name,
+          },
+          { onConflict: 'arweave_tx_id' }
+        )
+
+      if (dbError) {
+        // log but don't fail — Arweave upload succeeded, Supabase is just a cache
+        console.error('Supabase index write failed (non-fatal):', dbError.message)
+      } else {
+        console.log('Supabase index updated for TX:', transaction.id)
+      }
+    } catch (dbErr) {
+      // Supabase failure is non-fatal — book is still on Arweave
+      console.error('Supabase index error (non-fatal):', dbErr)
+    }
+
     return NextResponse.json({ txId: transaction.id })
 
   } catch (err) {
