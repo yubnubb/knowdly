@@ -159,10 +159,12 @@ export default function LibraryPage() {
 
     await Promise.all(tokenIds.map(async id => {
       const token = await getToken(walletAddr, id)
+      console.log('Token:', id, '→ bookId:', token?.bookId)
       if (!token) return
 
       // get arweaveTxId directly from contract — no localStorage needed
       const arweaveTxId = await getBookArweaveTxId(walletAddr, token.bookId)
+      console.log('ArweaveTxId for bookId', token.bookId, ':', arweaveTxId)
       if (arweaveTxId) {
         onChainOwned.add(arweaveTxId)
         console.log('NFT ownership confirmed:', token.id, '→', arweaveTxId)
