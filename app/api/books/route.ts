@@ -229,8 +229,8 @@ async function queryArweave(
 // Dual indexing strategy:
 //   1. Query Supabase first (fast, centralised)
 //   2. Query Arweave GraphQL as fallback (slow, decentralised)
-//   3. Merge and deduplicate results by txId
-//   4. Arweave results fill in any gaps Supabase might have missed
+//   3. Filter both against Supabase blocklist
+//   4. Merge and deduplicate results by txId
 
 export async function GET(request: NextRequest) {
   try {
@@ -239,31 +239,46 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category') || ''
     const format   = searchParams.get('format')   || ''
 
+    // ── Fetch blocklist from Supabase ─────────────────────────────────────────
+    // Blocks specific Arweave TX IDs from appearing in the library
+    // Used to hide test uploads, unavailable books, or flagged content
+    // Permanently stored on Arweave but hidden from discovery
+    let blockedIds = new Set<string>()
+    try {
+      const supabase = getSupabase()
+      const { data: blocked } = await supabase
+        .from('blocklist')
+        .select('arweave_tx_id')
+      blockedIds = new Set(blocked?.map((b: any) => b.arweave_tx_id) ?? [])
+      if (blockedIds.size > 0) {
+        console.log(`Blocklist active: ${blockedIds.size} TX IDs blocked`)
+      }
+    } catch (err) {
+      console.error('Could not fetch blocklist (non-fatal):', err)
+    }
+
     // ── Step 1: Query Supabase (primary centralised index) ────────────────────
     let supabaseBooks: Book[] = []
     try {
-      supabaseBooks = await querySupabase(search, category, format)
+      supabaseBooks = (await querySupabase(search, category, format))
+        .filter(b => !blockedIds.has(b.txId))
     } catch (err) {
       console.error('Supabase query failed, falling back to Arweave:', err)
     }
 
     // ── Step 2: Query Arweave GraphQL (decentralised fallback) ────────────────
-    // Always query Arweave to catch any books not yet in Supabase
-    // (e.g. uploaded before dual indexing was enabled, or if Supabase write failed)
     let arweaveBooks: Book[] = []
     try {
-      arweaveBooks = await queryArweave(search, category, format)
+      arweaveBooks = (await queryArweave(search, category, format))
+        .filter(b => !blockedIds.has(b.txId))
     } catch (err) {
       console.error('Arweave GraphQL query failed:', err)
     }
 
     // ── Step 3: Merge and deduplicate ─────────────────────────────────────────
-    // Supabase results take priority (more complete metadata, faster)
-    // Arweave results fill in any books not in Supabase
     const seen  = new Set<string>()
     const books: Book[] = []
 
-    // add Supabase books first
     for (const book of supabaseBooks) {
       if (!seen.has(book.txId)) {
         seen.add(book.txId)
@@ -271,7 +286,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // add any Arweave books not already in the list
     for (const book of arweaveBooks) {
       if (!seen.has(book.txId)) {
         seen.add(book.txId)
@@ -279,7 +293,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`Total books after merge: ${books.length} (${supabaseBooks.length} from Supabase, ${arweaveBooks.length} from Arweave)`)
+    console.log(`Total books after merge: ${books.length} (${supabaseBooks.length} from Supabase, ${arweaveBooks.length} from Arweave, ${blockedIds.size} blocked)`)
 
     return NextResponse.json({ books })
 
