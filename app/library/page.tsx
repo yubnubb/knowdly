@@ -150,31 +150,30 @@ export default function LibraryPage() {
 
   async function checkOnChainOwnership(walletAddr: string, bookList: Book[]) {
   try {
-    // get all token IDs owned by this wallet — pure on-chain NFT lookup
     const tokenIds = await getTokensByOwner(walletAddr)
-    if (tokenIds.length === 0) return
+    console.log('Token IDs:', tokenIds, 'length:', tokenIds.length)
+    if (!tokenIds || tokenIds.length === 0) return
 
-    // for each token get the bookId, then get the arweaveTxId from the contract
     const onChainOwned = new Set<string>()
 
-    await Promise.all(tokenIds.map(async id => {
-  try {
-    console.log('Fetching token:', id)
-    const token = await getToken(walletAddr, id)
-    console.log('Token result:', id, token)
-    if (!token) return
+    // process tokens sequentially instead of parallel — easier to debug
+    for (const rawId of tokenIds) {
+      const id = Number(rawId) // force convert BigInt → number
+      console.log('Processing token ID:', id, 'type:', typeof id)
+      try {
+        const token = await getToken(walletAddr, id)
+        console.log('Token:', token)
+        if (!token) continue
 
-    console.log('Fetching arweaveTxId for bookId:', token.bookId)
-    const arweaveTxId = await getBookArweaveTxId(walletAddr, token.bookId)
-    console.log('ArweaveTxId result:', arweaveTxId)
-    
-    if (arweaveTxId) {
-      onChainOwned.add(arweaveTxId)
+        const arweaveTxId = await getBookArweaveTxId(walletAddr, Number(token.bookId))
+        console.log('ArweaveTxId:', arweaveTxId)
+        if (arweaveTxId) onChainOwned.add(arweaveTxId)
+      } catch (err) {
+        console.error('Token error:', id, err)
+      }
     }
-  } catch (err) {
-    console.error('Error processing token', id, ':', err)
-  }
-}))
+
+    console.log('Owned txIds:', Array.from(onChainOwned))
 
     if (onChainOwned.size > 0) {
       setOwnedBooks(prev => {
