@@ -42,7 +42,7 @@ function getSupabase() {
 
 const RPC_URL     = 'https://soroban-testnet.stellar.org'
 const NETWORK     = Networks.TESTNET
-const CONTRACT_ID = 'CATPB6WUFQXBU6Q3HWFNGPOBKLYSVTCKCMX25LZOIEMQQP4LXKKRR4YX'
+const CONTRACT_ID = 'CAHXGGN2SCRT5ULEXCMEJMSSVXBA4KF3K4Z2XMZPWFU3NFQDGSYKDQ73'
 
 // ── Verify ownership on-chain ─────────────────────────────────────────────────
 // calls owns_book() on the Soroban contract

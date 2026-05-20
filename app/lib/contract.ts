@@ -25,7 +25,7 @@ import { signTransaction } from '@stellar/freighter-api'
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
-export const CONTRACT_ID = 'CATPB6WUFQXBU6Q3HWFNGPOBKLYSVTCKCMX25LZOIEMQQP4LXKKRR4YX'
+export const CONTRACT_ID = 'CAHXGGN2SCRT5ULEXCMEJMSSVXBA4KF3K4Z2XMZPWFU3NFQDGSYKDQ73'
 
 const HORIZON_URL = 'https://horizon-testnet.stellar.org'
 const RPC_URL     = 'https://soroban-testnet.stellar.org'
@@ -208,6 +208,39 @@ export async function buildAndSignRegisterBook(
   }
 
   return signResult.signedTxXdr
+}
+
+// ── updateArweaveTx ───────────────────────────────────────────────────────────
+// Called after Arweave upload succeeds — writes the real Arweave TX ID
+// to the Soroban contract, replacing the placeholder used during signing.
+// This makes ownership → content mapping fully on-chain with no localStorage
+// or Supabase dependency.
+
+export async function updateArweaveTx(
+  publisherAddress: string,
+  bookId:           number,
+  arweaveTxId:      string,
+): Promise<void> {
+  const account  = await loadAccount(publisherAddress)
+  const contract = new Contract(CONTRACT_ID)
+
+  const transaction = new TransactionBuilder(account, {
+    fee:               BASE_FEE,
+    networkPassphrase: NETWORK,
+  })
+    .addOperation(
+      contract.call(
+        'update_arweave_tx',
+        nativeToScVal(publisherAddress, { type: 'address' }),
+        nativeToScVal(BigInt(bookId),   { type: 'u64' }),
+        nativeToScVal(arweaveTxId,      { type: 'string' }),
+      )
+    )
+    .setTimeout(30)
+    .build()
+
+  await simulateAndSubmit(transaction)
+  console.log('Arweave TX ID updated on-chain for book', bookId, '→', arweaveTxId)
 }
 
 // ── getTotalBooks ─────────────────────────────────────────────────────────────
@@ -434,14 +467,14 @@ export async function ownsBook(
     return false
   }
 }
-
-// ── getBookArweaveTxId ───────────────────────────────────────────────────────
-// Returns the Arweave TX ID for a given bookId by calling the contract's get_book method.
-// Used to link on-chain book records to their corresponding Arweave metadata/content.
+// ── getBookArweaveTxId ────────────────────────────────────────────────────────
+// Returns the Arweave TX ID stored on-chain for a given book ID
+// After update_arweave_tx is called this returns the real TX ID
+// Used by checkOnChainOwnership to map NFT token → book content
 
 export async function getBookArweaveTxId(
   callerAddress: string,
-  bookId: number,
+  bookId:        number,
 ): Promise<string | null> {
   const contract = new Contract(CONTRACT_ID)
   const account  = new Account(callerAddress, '0')

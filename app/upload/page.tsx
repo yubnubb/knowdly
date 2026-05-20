@@ -16,7 +16,7 @@
 'use client'
 
 import { useState } from 'react'
-import { buildAndSignRegisterBook, submitSignedTransaction, getTotalBooks } from '../lib/contract'
+import { buildAndSignRegisterBook, submitSignedTransaction, getTotalBooks, updateArweaveTx } from '../lib/contract'
 import { requestAccess } from '@stellar/freighter-api'
 import { generateKey, exportKey, encryptFile } from '../lib/crypto'
 
@@ -247,6 +247,21 @@ export default function UploadPage() {
       }
 
       console.log('Encryption key stored securely.')
+      setProgress(95)
+
+      // ── Step 7: Update real Arweave TX ID on-chain ────────────────────
+      // Replaces the placeholder with the real TX ID so ownership →
+      // content mapping is fully on-chain — no localStorage needed
+      setStep('Updating on-chain metadata...')
+      try {
+        await updateArweaveTx(walletAddress, bookId, arweaveTxId)
+        console.log('Arweave TX ID written on-chain successfully')
+      } catch (updateErr) {
+        // non-fatal — book is registered and readable, just the on-chain
+        // TX ID link is missing. getBookArweaveTxId will return placeholder.
+        console.error('Could not update Arweave TX ID on-chain (non-fatal):', updateErr)
+      }
+
       setProgress(100)
       setStep('Complete')
       setStatus('done')

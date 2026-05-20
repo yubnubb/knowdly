@@ -16,7 +16,7 @@ import {
 } from '@stellar/stellar-sdk'
 import { signTransaction, requestAccess } from '@stellar/freighter-api'
 
-const CONTRACT_ID  = 'CATPB6WUFQXBU6Q3HWFNGPOBKLYSVTCKCMX25LZOIEMQQP4LXKKRR4YX'
+const CONTRACT_ID  = 'CAHXGGN2SCRT5ULEXCMEJMSSVXBA4KF3K4Z2XMZPWFU3NFQDGSYKDQ73'
 const RPC_URL      = 'https://soroban-testnet.stellar.org'
 const HORIZON_URL  = 'https://horizon-testnet.stellar.org'
 const NETWORK      = Networks.TESTNET
