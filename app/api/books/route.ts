@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const ARWEAVE_GRAPHQL = 'http://localhost:1984/graphql'
+const ARWEAVE_GRAPHQL = process.env.ARWEAVE_GRAPHQL ?? 'https://arweave.net/graphql'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
